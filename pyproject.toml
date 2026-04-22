@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Pai-Sho-Lab"
+version = "0.1.0"
+description = "A Skud Pai Sho game engine and AI bot framework with a web UI"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Amitai Sela", email = "amitaisela@gmail.com" },
+]
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Board Games",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Framework :: Flask",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "flask>=2.3.0",
+    "numpy>=1.24.0",
+    "requests>=2.32",
+    "tqdm>=4.65.0",
+    "torch>=2.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Amitaisela/pai-sho-lab"
+Repository = "https://github.com/Amitaisela/pai-sho-lab"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ai*", "game*", "ui*"]

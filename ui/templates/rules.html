@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rules — Skud Pai Sho</title>
+    <style>
+        :root {
+          --bg:        #161512;
+          --bg-light:  #1d1b18;
+          --panel:     #262421;
+          --panel-hover: #302e2c;
+          --border:    #3a3835;
+          --text:      #bababa;
+          --text-dim:  #8b8987;
+          --text-bright: #e0e0e0;
+          --accent:    #629924;
+          --accent-hover: #7ab82e;
+          --link:      #81b64c;
+          --red:       #c44;
+          --radius: 4px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Noto Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+          font-size: 14px;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+        header {
+          width: 100%;
+          height: 44px;
+          background: var(--panel);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          letter-spacing: .02em;
+        }
+        .logo span { font-weight: 400; color: var(--text-dim); }
+        .btn {
+          background: var(--panel-hover);
+          border: none;
+          color: var(--text);
+          font-family: inherit;
+          font-size: .8rem;
+          font-weight: 600;
+          padding: 6px 14px;
+          border-radius: var(--radius);
+          cursor: pointer;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn:hover { background: #403e3b; color: var(--text-bright); }
+
+        .content {
+          max-width: 860px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 32px 24px 64px;
+        }
+        h1 {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          margin-bottom: 8px;
+        }
+        .subtitle {
+          color: var(--text-dim);
+          font-size: .9rem;
+          margin-bottom: 28px;
+        }
+        h2 {
+          font-size: 1.05rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          margin-top: 28px;
+          margin-bottom: 10px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--border);
+        }
+        h3 {
+          font-size: .95rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          margin-top: 16px;
+          margin-bottom: 6px;
+        }
+        p, li { line-height: 1.65; margin-bottom: 8px; }
+        ul, ol { padding-left: 24px; margin-bottom: 12px; }
+        strong { color: var(--text-bright); }
+        .highlight { color: var(--link); font-weight: 600; }
+        .clash-txt { color: #e07070; font-weight: 600; }
+        .tip {
+          background: #262a1f;
+          border-left: 3px solid var(--accent);
+          padding: 12px 16px;
+          margin: 16px 0;
+          border-radius: 0 var(--radius) var(--radius) 0;
+          font-size: .88rem;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 8px 0 16px;
+          font-size: .88rem;
+        }
+        th, td {
+          padding: 7px 10px;
+          border-bottom: 1px solid var(--border);
+          text-align: left;
+          vertical-align: top;
+        }
+        th {
+          background: var(--bg-light);
+          color: var(--text-bright);
+          font-weight: 600;
+        }
+        tr:last-child td { border-bottom: none; }
+
+        .circle-wrap {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin: 16px 0 24px;
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 18px;
+        }
+        .circle-wrap svg { max-width: 420px; width: 100%; height: auto; }
+        .legend {
+          display: flex;
+          gap: 22px;
+          margin-top: 10px;
+          font-size: .82rem;
+          color: var(--text-dim);
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+        .legend-swatch {
+          display: inline-block;
+          width: 22px;
+          height: 3px;
+          border-radius: 2px;
+        }
+        .legend-swatch.h { background: var(--accent); }
+        .legend-swatch.c {
+          background: transparent;
+          border-top: 2px dashed #e07070;
+          height: 0;
+          width: 22px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">Skud <span>Pai Sho</span></div>
+        <a href="/" class="btn">Game</a>
+        <a href="/train" class="btn">Train</a>
+        <a href="/simulate" class="btn">Simulate</a>
+        <a href="/leaderboard" class="btn">Leaderboard</a>
+        <a href="/guide" class="btn">Guide</a>
+    </div>
+    <div style="font-size:.85rem; font-weight:600; color:var(--text-bright);">Rules</div>
+</header>
+
+<div class="content">
+    <h1>How to Play Skud Pai Sho</h1>
+    <p class="subtitle">A two-player strategy game on a circular board. Plant flowers, form harmonies, and close a ring around the center to win.</p>
+
+    <h2>The Goal</h2>
+    <p>Be the first player to form a <span class="highlight">Harmony Ring</span> — a connected chain of your own harmonies that fully encloses the center of the board. Two other endings exist (last basic flower planted, forfeit) and are covered below.</p>
+
+    <h2>The Board &amp; Your Tiles</h2>
+    <ul>
+        <li>The board is a circle inside a 19×19 grid with four <strong>Gates</strong> on the cardinal edges (N, S, E, W). Flowers enter play through your Gates.</li>
+        <li>The playing surface is split into <strong>Red</strong>, <strong>White</strong>, and <strong>Neutral</strong> gardens. A red flower may only rest on red or neutral gardens; a white flower only on white or neutral. The center space itself cannot be occupied.</li>
+        <li>Each player's set contains six <strong>Basic Flowers</strong> (three red: Rose, Chrysanthemum, Rhododendron — three white: Jasmine, Lily, Jade), two <strong>Special Flowers</strong> (White Lotus, Orchid), and four <strong>Accent Tiles</strong> (Rock, Wheel, Knotweed, Boat).</li>
+    </ul>
+
+    <h2>The Circle of Harmony</h2>
+    <p>The six basic flowers relate to each other on a circle. <span class="highlight">Adjacent</span> flowers can form a harmony with each other. Flowers <span class="clash-txt">opposite</span> on the circle (same number, opposite colour) <strong>clash</strong>.</p>
+
+    <div class="circle-wrap">
+      <svg viewBox="-40 0 480 400" xmlns="http://www.w3.org/2000/svg">
+        <!-- Clash lines (opposite pairs, pass through center) -->
+        <g stroke="#e07070" stroke-width="2" stroke-dasharray="6 5" opacity="0.85">
+          <line x1="200" y1="70"     x2="200" y2="330"/>
+          <line x1="312.58" y1="135" x2="87.42" y2="265"/>
+          <line x1="312.58" y1="265" x2="87.42" y2="135"/>
+        </g>
+        <!-- Harmony lines (adjacent pairs, hexagon perimeter) -->
+        <g stroke="#629924" stroke-width="3" opacity="0.9">
+          <line x1="200"    y1="70"  x2="312.58" y2="135"/>
+          <line x1="312.58" y1="135" x2="312.58" y2="265"/>
+          <line x1="312.58" y1="265" x2="200"    y2="330"/>
+          <line x1="200"    y1="330" x2="87.42"  y2="265"/>
+          <line x1="87.42"  y1="265" x2="87.42"  y2="135"/>
+          <line x1="87.42"  y1="135" x2="200"    y2="70"/>
+        </g>
+        <!-- Tile images, each roughly 56×56 -->
+        <image href="/static/tiles/HR3.png" x="172" y="42"  width="56" height="56"/>
+        <image href="/static/tiles/HR4.png" x="284.58" y="107" width="56" height="56"/>
+        <image href="/static/tiles/HR5.png" x="284.58" y="237" width="56" height="56"/>
+        <image href="/static/tiles/HW3.png" x="172" y="302" width="56" height="56"/>
+        <image href="/static/tiles/HW4.png" x="59.42" y="237" width="56" height="56"/>
+        <image href="/static/tiles/HW5.png" x="59.42" y="107" width="56" height="56"/>
+        <!-- Labels -->
+        <g font-family="'Noto Sans',sans-serif" font-size="11" fill="#bababa">
+          <text x="200" y="24"  text-anchor="middle">Rose (R3)</text>
+          <text x="200" y="378" text-anchor="middle">Jasmine (W3)</text>
+          <text x="352" y="138" text-anchor="start">Chrys. (R4)</text>
+          <text x="352" y="272" text-anchor="start">Rhodo. (R5)</text>
+          <text x="48"  y="138" text-anchor="end">Jade (W5)</text>
+          <text x="48"  y="272" text-anchor="end">Lily (W4)</text>
+        </g>
+      </svg>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-swatch h"></span> Harmony (adjacent)</span>
+        <span class="legend-item"><span class="legend-swatch c"></span> Clash (opposite)</span>
+      </div>
+    </div>
+
+    <h2>Your Turn</h2>
+    <p>On each turn, take <strong>one</strong> of the following actions:</p>
+    <ul>
+        <li><strong>Plant</strong> — place a basic flower from your reserve onto one of your own open Gates.</li>
+        <li><strong>Arrange</strong> — move a basic or special flower already on the board in a straight line (no diagonals, no jumping over tiles) up to its movement range.</li>
+    </ul>
+    <p>A flower is <strong>Blooming</strong> once it has left its Gate and is standing on a legal garden space. Only blooming flowers participate in harmonies and most interactions. Freshly-planted flowers on their Gate are <em>growing</em>, not yet blooming.</p>
+
+    <h2>Flower Moves</h2>
+    <table>
+        <thead><tr><th>Tile</th><th>Type</th><th>Moves</th></tr></thead>
+        <tbody>
+            <tr><td>Rose</td><td>Red basic</td><td>3</td></tr>
+            <tr><td>Chrysanthemum</td><td>Red basic</td><td>4</td></tr>
+            <tr><td>Rhododendron</td><td>Red basic</td><td>5</td></tr>
+            <tr><td>Jasmine</td><td>White basic</td><td>3</td></tr>
+            <tr><td>Lily</td><td>White basic</td><td>4</td></tr>
+            <tr><td>Jade</td><td>White basic</td><td>5</td></tr>
+            <tr><td>White Lotus</td><td>Special</td><td>2</td></tr>
+            <tr><td>Orchid</td><td>Special</td><td>6</td></tr>
+        </tbody>
+    </table>
+
+    <h2>Harmonies</h2>
+    <p>Two of your <strong>blooming</strong> basic flowers form a <span class="highlight">Harmony</span> when:</p>
+    <ul>
+        <li>They are <strong>neighbours on the Circle of Harmony</strong> (see diagram above), and</li>
+        <li>They share the same row or column, with <strong>nothing between them</strong> (no flowers, accent tiles, or disabling effects).</li>
+    </ul>
+    <p>Harmonies belong to you and appear on the board as a coloured line linking the two tiles.</p>
+
+    <h3>Harmony Bonus</h3>
+    <p>Whenever you <em>create a new harmony</em> on your turn (through a plant or an arrange), you immediately receive a <strong>bonus action</strong>: plant an accent tile from your reserve, <em>or</em> place one of your special flowers (White Lotus / Orchid) onto one of your Gates. You only get one bonus per new harmony created; forming multiple harmonies in one turn does <em>not</em> stack.</p>
+
+    <h2>Clashes</h2>
+    <p>Two basic flowers <span class="clash-txt">clash</span> when they sit <strong>opposite</strong> each other on the Circle of Harmony (same number, opposite colour: Rose↔Jasmine, Chrysanthemum↔Lily, Rhododendron↔Jade). Clashing flowers <strong>cannot form a harmony</strong> on a line that runs through the other, regardless of who owns them.</p>
+
+    <h3>Clash Traps</h3>
+    <p>A <strong>clash trap</strong> happens when a flower ends up on a line with an opposing clash partner such that it can't move without colliding further. Use clashes to block your opponent's intended harmony lines.</p>
+
+    <h2>Captures</h2>
+    <p>You may <strong>capture</strong> an opposing basic flower by ending a move on its space, but only if the captured flower is <em>not currently in a harmony</em>. Harmonised flowers are protected. Captured flowers are removed from the board and returned to the opposing player's reserve.</p>
+
+    <h2>Accent Tiles</h2>
+    <p>Accent tiles are placed as a <strong>Harmony Bonus</strong>. Each accent has its own placement rules and effect:</p>
+    <ul>
+        <li><strong>Rock</strong> — an immovable obstacle. Any flower on one of the four grid lines passing through the rock <em>cannot form harmonies along that line</em>. Cannot be placed on a gate or the center.</li>
+        <li><strong>Wheel</strong> — when placed, it rotates the eight surrounding tiles one step <em>clockwise</em> around it. Tiles that can't legally move stay put.</li>
+        <li><strong>Knotweed</strong> — disables harmonies for the eight flowers adjacent to it (including diagonals). It does not move them, only mutes them.</li>
+        <li><strong>Boat</strong> — placed <em>on top of</em> an existing flower or accent. When placed on a flower, you may move that flower to any legal space on the board. When placed on an accent, it simply removes it. The Boat is consumed afterwards.</li>
+    </ul>
+
+    <h2>Special Flower Tiles</h2>
+    <p>Special flowers are <em>not</em> in your starting reserve in play; you deploy them via a Harmony Bonus (place onto one of your open Gates, like planting a basic flower).</p>
+    <h3>White Lotus</h3>
+    <p>Moves up to 2 spaces. The White Lotus may form a harmony with <em>any</em> basic flower on the same row/column (with nothing in between), regardless of whom the basic flower belongs to. A harmony that involves an opponent's basic flower still belongs to the owner of that basic flower — use carefully.</p>
+    <h3>Orchid</h3>
+    <p>Moves up to 6 spaces — the longest range in the game. The Orchid <strong>traps</strong> every opposing basic flower on the four squares orthogonally adjacent to it (those flowers cannot move). While a blooming White Lotus is on the board, every Orchid temporarily becomes <em>wild</em>: it can stand on any garden colour.</p>
+
+    <h2>Winning the Game</h2>
+    <p>The game ends by one of three conditions (checked in this order):</p>
+    <ol>
+        <li><strong>Harmony Ring</strong> — a connected loop of <em>your own</em> harmonies that fully encloses the center space. The player who completes it wins immediately.</li>
+        <li><strong>Last Basic Flower</strong> — the moment a player plants their <em>last</em> basic flower onto the board (their basic-flower reserve becomes empty), the game ends. The winner is the player with more <strong>midline-crossing harmonies</strong> — harmonies whose two tiles lie on opposite sides of one of the four lines that divide the board into quadrants (row 9 and column 9). If both players have the same count, the game is a tie.</li>
+        <li><strong>Forfeit</strong> — a player may resign at any time.</li>
+    </ol>
+
+    <div class="tip">
+        <strong>Tip:</strong> Harmonies are worth more than captures. Plan your ring around the center from your very first plant — the opening Gate you choose decides the geometry of the whole game.
+    </div>
+
+    <p style="margin-top: 28px; font-size: .85rem; color: var(--text-dim);">
+        Full original rulebook and variants at
+        <a href="https://skudpaisho.com/" class="highlight" target="_blank" rel="noopener">skudpaisho.com</a>.
+    </p>
+
+    <p style="margin-top: 24px;"><a href="/" class="btn" style="background:var(--accent); color:#fff;">← Back to the Game</a></p>
+</div>
+
+</body>
+</html>
