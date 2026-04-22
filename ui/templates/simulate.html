@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulate Matchups — Skud Pai Sho</title>
+    <style>
+        :root {
+          --bg:        #161512;
+          --bg-light:  #1d1b18;
+          --panel:     #262421;
+          --panel-hover: #302e2c;
+          --border:    #3a3835;
+          --text:      #bababa;
+          --text-dim:  #8b8987;
+          --text-bright: #e0e0e0;
+          --accent:    #629924;
+          --accent-hover: #7ab82e;
+          --p1:       #4a90d9;
+          --p2:       #d94a4a;
+          --radius: 4px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+          background: var(--bg); color: var(--text);
+          font-family: 'Noto Sans', 'Segoe UI', Roboto, sans-serif;
+          font-size: 14px; min-height: 100vh;
+          display: flex; flex-direction: column;
+        }
+        header {
+          width: 100%; height: 44px; background: var(--panel);
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0 16px; border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo { font-size: 1.1rem; font-weight: 700; color: var(--text-bright); }
+        .logo span { font-weight: 400; color: var(--text-dim); }
+
+        .btn {
+          background: var(--panel-hover); border: none; color: var(--text);
+          font-family: inherit; font-size: .8rem; font-weight: 600;
+          padding: 6px 14px; border-radius: var(--radius); cursor: pointer;
+          transition: background .15s, color .15s; letter-spacing: .02em;
+          text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn:hover { background: #403e3b; color: var(--text-bright); }
+        .btn-accent { background: var(--accent); color: #fff; }
+        .btn-accent:hover { background: var(--accent-hover); }
+        .btn-danger { background: #8b2020; color: #eaa; }
+        .btn-danger:hover { background: #a52a2a; color: #fff; }
+        .btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+        .page {
+          display: flex; flex: 1; max-width: 1400px; width: 100%;
+          margin: 0 auto; padding: 24px 16px; gap: 24px;
+        }
+        .config-panel {
+          width: 380px; flex-shrink: 0;
+          display: flex; flex-direction: column; gap: 16px;
+        }
+        .section {
+          background: var(--panel); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 16px;
+        }
+        .section-title {
+          font-size: .75rem; font-weight: 700; text-transform: uppercase;
+          letter-spacing: .08em; color: var(--text-dim); margin-bottom: 12px;
+        }
+        .player-title { display: flex; align-items: center; gap: 6px; }
+        .player-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .player-dot.p1 { background: var(--p1); }
+        .player-dot.p2 { background: var(--p2); }
+
+        select.param-input {
+          width: 100%; text-align: left;
+        }
+        .param-group { display: flex; flex-direction: column; gap: 10px; }
+        .param-row {
+          display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .param-label { font-size: .8rem; color: var(--text); cursor: help; flex-shrink: 0; }
+        .param-input {
+          background: var(--bg); border: 1px solid var(--border);
+          color: var(--text-bright); border-radius: var(--radius);
+          padding: 5px 8px; font-family: inherit; font-size: .8rem;
+          width: 140px; text-align: right; transition: border-color .15s;
+        }
+        .param-input:focus { border-color: var(--accent); outline: none; }
+        .param-row.checkbox { justify-content: flex-start; gap: 8px; }
+        .param-row.checkbox input[type="checkbox"] {
+          accent-color: var(--accent); width: 16px; height: 16px; cursor: pointer;
+        }
+        .agent-select { margin-bottom: 10px; }
+        .agent-desc { font-size: .7rem; color: var(--text-dim); margin: 4px 0 10px; }
+
+        .action-buttons { display: flex; gap: 8px; }
+        .action-buttons .btn { flex: 1; justify-content: center; padding: 8px 14px; }
+
+        .dashboard {
+          flex: 1; display: flex; flex-direction: column; gap: 16px; min-width: 0;
+        }
+        .status-banner {
+          display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+          border-radius: var(--radius); border: 1px solid var(--border); background: var(--panel);
+        }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .status-dot.idle { background: var(--text-dim); }
+        .status-dot.running { background: var(--accent); animation: pulse 1.5s infinite; }
+        .status-dot.completed { background: var(--p1); }
+        .status-dot.error { background: var(--p2); }
+        .status-dot.stopping { background: #d9a54a; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+        .status-text { font-size: .9rem; font-weight: 600; color: var(--text-bright); }
+        .status-detail { font-size: .8rem; color: var(--text-dim); margin-left: auto; }
+
+        .progress-wrap {
+          background: var(--bg-light); border: 1px solid var(--border);
+          border-radius: var(--radius); height: 28px; position: relative; overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+          transition: width .3s ease; border-radius: var(--radius);
+        }
+        .progress-text {
+          position: absolute; inset: 0;
+          display: flex; align-items: center; justify-content: center;
+          font-size: .75rem; font-weight: 700; color: var(--text-bright);
+          text-shadow: 0 1px 3px rgba(0,0,0,.6);
+        }
+
+        .stats-grid {
+          display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;
+        }
+        .stat-card {
+          background: var(--panel); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 10px 12px;
+        }
+        .stat-label {
+          font-size: .65rem; font-weight: 600; text-transform: uppercase;
+          letter-spacing: .06em; color: var(--text-dim); margin-bottom: 4px;
+        }
+        .stat-value { font-size: 1.1rem; font-weight: 700; color: var(--text-bright); }
+
+        .log-wrap { flex: 1; display: flex; flex-direction: column; min-height: 200px; }
+        .log-header {
+          display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+        }
+        .log-header .section-title { margin-bottom: 0; }
+        .log-console {
+          flex: 1; background: var(--bg); border: 1px solid var(--border);
+          border-radius: var(--radius); padding: 10px;
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+          font-size: .72rem; line-height: 1.5; overflow-y: auto;
+          max-height: 500px; white-space: pre-wrap; word-break: break-all; color: var(--text-dim);
+        }
+        .log-console .log-highlight { color: var(--accent); }
+        .log-console .log-error { color: var(--p2); }
+        .log-console .log-info { color: var(--text); }
+        .log-console .log-p1 { color: var(--p1); }
+        .log-console .log-p2 { color: var(--p2); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">Skud <span>Pai Sho</span></div>
+        <a href="/" class="btn">Game</a>
+        <a href="/train" class="btn">Train</a>
+        <a href="/leaderboard" class="btn">Leaderboard</a>
+        <a href="/guide" class="btn">Guide</a>
+    </div>
+    <div style="font-size:.85rem; font-weight:600; color:var(--text-bright);">Local Simulation</div>
+</header>
+
+<div class="page">
+    <!-- Left: Configuration -->
+    <div class="config-panel">
+        <!-- Player 1 -->
+        <div class="section">
+            <div class="section-title player-title"><span class="player-dot p1"></span>Player 1</div>
+            <select class="param-input agent-select" id="p1-agent" onchange="renderAgentParams(1)"></select>
+            <div class="agent-desc" id="p1-desc"></div>
+            <div class="agent-desc" id="p1-elo" style="color:var(--accent);">ELO: —</div>
+            <div class="param-group" id="p1-params"></div>
+        </div>
+
+        <!-- Player 2 -->
+        <div class="section">
+            <div class="section-title player-title"><span class="player-dot p2"></span>Player 2</div>
+            <select class="param-input agent-select" id="p2-agent" onchange="renderAgentParams(2)"></select>
+            <div class="agent-desc" id="p2-desc"></div>
+            <div class="agent-desc" id="p2-elo" style="color:var(--accent);">ELO: —</div>
+            <div class="param-group" id="p2-params"></div>
+        </div>
+
+        <!-- General settings -->
+        <div class="section">
+            <div class="section-title">Simulation Settings</div>
+            <div class="param-group">
+                <div class="param-row">
+                    <label class="param-label" for="n-games" title="Number of games to play">Episodes</label>
+                    <input type="number" class="param-input" id="n-games" value="10" min="1" step="1">
+                </div>
+                <div class="param-row">
+                    <label class="param-label" for="max-steps" title="Maximum number of steps per game before declaring a stalemate">Max steps</label>
+                    <input type="number" class="param-input" id="max-steps" value="1000" min="1" step="1">
+                </div>
+                <div class="param-row checkbox">
+                    <input type="checkbox" id="save-results">
+                    <label class="param-label" for="save-results">Save results CSV</label>
+                </div>
+                <div class="param-row checkbox">
+                    <input type="checkbox" id="save-games">
+                    <label class="param-label" for="save-games">Save full game files</label>
+                </div>
+                <div class="param-row">
+                    <label class="param-label" for="save-period" title="Save a game file every N games">Save period</label>
+                    <input type="number" class="param-input" id="save-period" value="1" min="1" step="1">
+                </div>
+                <div class="param-row checkbox">
+                    <input type="checkbox" id="verbose" checked>
+                    <label class="param-label" for="verbose">Verbose log</label>
+                </div>
+                <div class="param-row checkbox">
+                    <input type="checkbox" id="rated" checked>
+                    <label class="param-label" for="rated" title="Update ELO ratings based on results">Count toward ELO</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button type="button" class="btn btn-accent" id="start-btn" onclick="startSim()">Run Simulation</button>
+            <button type="button" class="btn btn-danger" id="stop-btn" onclick="stopSim()" disabled>Stop</button>
+        </div>
+    </div>
+
+    <!-- Right: Dashboard -->
+    <div class="dashboard">
+        <div class="status-banner">
+            <div class="status-dot idle" id="status-dot"></div>
+            <span class="status-text" id="status-text">Idle</span>
+            <span class="status-detail" id="status-detail"></span>
+        </div>
+
+        <div class="progress-wrap">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            <div class="progress-text" id="progress-text">0 / 0</div>
+        </div>
+
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <div class="log-wrap">
+            <div class="log-header">
+                <div class="section-title">Simulation Log</div>
+                <button class="btn" style="padding:3px 8px; font-size:.7rem;" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="log-console" id="log-console">Configure both players and click "Run Simulation".</div>
+        </div>
+    </div>
+</div>
+
+<script>
+let AGENTS = [];                  // list of playable agent entries
+let AGENTS_BY_KEY = {};
+let eventSource = null;
+let isRunning = false;
+
+// ── Load playable agent registry ──
+(async function loadRegistry() {
+    try {
+        const res = await fetch('/api/agents/registry');
+        const data = await res.json();
+        AGENTS = (data.play || []).filter(a => a.key !== 'human');
+        AGENTS.forEach(a => { AGENTS_BY_KEY[a.key] = a; });
+
+        [1, 2].forEach(p => {
+            const sel = document.getElementById(`p${p}-agent`);
+            sel.innerHTML = AGENTS.map(a =>
+                `<option value="${a.key}">${a.display_name}</option>`
+            ).join('');
+        });
+
+        // Default picks
+        if (AGENTS.find(a => a.key === 'minimax')) {
+            document.getElementById('p1-agent').value = 'minimax';
+        }
+        if (AGENTS.find(a => a.key === 'random')) {
+            document.getElementById('p2-agent').value = 'random';
+        }
+        renderAgentParams(1);
+        renderAgentParams(2);
+        refreshEloDisplay();
+    } catch (e) {
+        console.error('Failed to load agent registry:', e);
+    }
+})();
+
+async function refreshEloDisplay() {
+    try {
+        const rr = await fetch('/api/elo/leaderboard');
+        const lb = await rr.json();
+        const ratings = {};
+        (lb.rows || []).forEach(r => { ratings[r.key] = r.rating; });
+        const p1key = document.getElementById('p1-agent').value;
+        const p2key = document.getElementById('p2-agent').value;
+        document.getElementById('p1-elo').textContent = 'ELO: ' + (ratings[p1key] != null ? ratings[p1key] : '1200 (new)');
+        document.getElementById('p2-elo').textContent = 'ELO: ' + (ratings[p2key] != null ? ratings[p2key] : '1200 (new)');
+    } catch (e) {}
+}
+
+function renderAgentParams(player) {
+    const key = document.getElementById(`p${player}-agent`).value;
+    const agent = AGENTS_BY_KEY[key];
+    document.getElementById(`p${player}-desc`).textContent = agent ? (agent.description || '') : '';
+    if (typeof refreshEloDisplay === 'function') refreshEloDisplay();
+    const form = document.getElementById(`p${player}-params`);
+    const params = (agent && agent.play_params) || [];
+
+    if (params.length === 0) {
+        form.innerHTML = '<div style="font-size:.75rem; color:var(--text-dim);">No parameters.</div>';
+        return;
+    }
+    form.innerHTML = params.map(p => {
+        if (p.type === 'checkbox') {
+            return `<div class="param-row checkbox">
+                <input type="checkbox" id="p${player}-param-${p.key}" ${p.default ? 'checked' : ''} title="${p.tooltip || ''}">
+                <label class="param-label" for="p${player}-param-${p.key}">${p.label}</label>
+            </div>`;
+        }
+        const attrs = [
+            `type="${p.type || 'number'}"`,
+            `id="p${player}-param-${p.key}"`,
+            `value="${p.default}"`,
+            `title="${p.tooltip || ''}"`,
+            `class="param-input"`,
+        ];
+        if (p.step !== undefined) attrs.push(`step="${p.step}"`);
+        if (p.min !== undefined) attrs.push(`min="${p.min}"`);
+        if (p.max !== undefined) attrs.push(`max="${p.max}"`);
+        return `<div class="param-row">
+            <label class="param-label" for="p${player}-param-${p.key}" title="${p.tooltip || ''}">${p.label}</label>
+            <input ${attrs.join(' ')}>
+        </div>`;
+    }).join('');
+}
+
+function collectAgentParams(player) {
+    const key = document.getElementById(`p${player}-agent`).value;
+    const agent = AGENTS_BY_KEY[key];
+    const out = {};
+    ((agent && agent.play_params) || []).forEach(p => {
+        const el = document.getElementById(`p${player}-param-${p.key}`);
+        if (!el) return;
+        if (p.type === 'checkbox') out[p.key] = el.checked;
+        else if (p.type === 'number' || p.type === undefined) out[p.key] = parseFloat(el.value);
+        else out[p.key] = el.value;
+    });
+    return { model: key, params: out };
+}
+
+async function startSim() {
+    if (isRunning) return;
+    const p1 = collectAgentParams(1);
+    const p2 = collectAgentParams(2);
+    const body = {
+        p1_model: p1.model, p1_params: p1.params,
+        p2_model: p2.model, p2_params: p2.params,
+        n_games: parseInt(document.getElementById('n-games').value) || 1,
+        max_steps: parseInt(document.getElementById('max-steps').value) || 1000,
+        save_results: document.getElementById('save-results').checked,
+        save_games: document.getElementById('save-games').checked,
+        save_period: parseInt(document.getElementById('save-period').value) || 1,
+        verbose: document.getElementById('verbose').checked,
+        rated: document.getElementById('rated').checked,
+    };
+
+    try {
+        const res = await fetch('/api/simulate/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Failed to start simulation'); return; }
+        setRunning(true);
+        clearLog();
+        connectSSE();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function stopSim() {
+    try { await fetch('/api/simulate/stop', { method: 'POST' }); } catch (e) {}
+}
+
+function connectSSE() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    eventSource = new EventSource('/api/simulate/stream?since=' + (clientLogSeq|0));
+    eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (typeof data.log_seq === 'number') clientLogSeq = data.log_seq;
+        updateDashboard(data);
+        if (data.status !== 'running' && data.status !== 'stopping') {
+            eventSource.close(); eventSource = null;
+            setRunning(false);
+        }
+    };
+    eventSource.onerror = () => {
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        setRunning(false);
+    };
+}
+
+function setRunning(running) {
+    isRunning = running;
+    document.getElementById('start-btn').disabled = running;
+    document.getElementById('stop-btn').disabled = !running;
+    document.querySelectorAll('.param-input, input[type="checkbox"]').forEach(el => {
+        if (el.id !== 'stop-btn') el.disabled = running;
+    });
+}
+
+function updateDashboard(data) {
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + (data.status || 'idle');
+    const labels = { idle: 'Idle', running: 'Running...', completed: 'Completed', error: 'Error', stopping: 'Stopping...' };
+    document.getElementById('status-text').textContent = labels[data.status] || data.status;
+    document.getElementById('status-detail').textContent = data.elapsed ? formatElapsed(data.elapsed) : '';
+
+    const total = data.total_games || 1;
+    const current = data.current_game || 0;
+    const pct = Math.min(100, Math.round((current / total) * 100));
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = `${current} / ${total}  (${pct}%)`;
+
+    renderStats(data);
+    if (data.new_log_lines && data.new_log_lines.length > 0) {
+        appendLog(data.new_log_lines);
+    } else if (data.log_lines && data.log_lines.length > 0 && !logInitialized) {
+        appendLog(data.log_lines);
+    }
+}
+
+function renderStats(data) {
+    if (data.p1_elo != null) document.getElementById('p1-elo').textContent = 'ELO: ' + data.p1_elo;
+    if (data.p2_elo != null) document.getElementById('p2-elo').textContent = 'ELO: ' + data.p2_elo;
+    const played = (data.p1_wins || 0) + (data.p2_wins || 0) + (data.draws || 0);
+    const rate = (v) => played > 0 ? ((v / played) * 100).toFixed(1) + '%' : '--';
+    const avg = played > 0 && data.elapsed
+        ? (data.elapsed / played).toFixed(2) + 's'
+        : '--';
+    const cards = [
+        { label: 'Games Played', value: played },
+        { label: 'P1 Wins', value: `${data.p1_wins || 0} (${rate(data.p1_wins || 0)})` },
+        { label: 'P2 Wins', value: `${data.p2_wins || 0} (${rate(data.p2_wins || 0)})` },
+        { label: 'Draws', value: `${data.draws || 0} (${rate(data.draws || 0)})` },
+        { label: 'Avg Game Time', value: avg },
+        { label: 'Elapsed', value: data.elapsed !== null && data.elapsed !== undefined ? formatElapsed(data.elapsed) : '--' },
+    ];
+    document.getElementById('stats-grid').innerHTML = cards.map(c => `
+        <div class="stat-card">
+            <div class="stat-label">${c.label}</div>
+            <div class="stat-value">${c.value}</div>
+        </div>`).join('');
+}
+
+const MAX_LOG_NODES = 600;
+let logInitialized = false;
+let clientLogSeq = 0;
+function formatLogLine(line) {
+    if (/error|traceback/i.test(line)) return `<span class="log-error">${esc(line)}</span>`;
+    if (/WINNER:\s*Player\s*1/i.test(line)) return `<span class="log-p1">${esc(line)}</span>`;
+    if (/WINNER:\s*Player\s*2/i.test(line)) return `<span class="log-p2">${esc(line)}</span>`;
+    if (/GAME\s+\d+\s+OVER|SIMULATION REPORT/i.test(line)) return `<span class="log-highlight">${esc(line)}</span>`;
+    if (/Game \d+ started|Turn \d+/i.test(line)) return `<span class="log-info">${esc(line)}</span>`;
+    return esc(line);
+}
+function appendLog(lines) {
+    const el = document.getElementById('log-console');
+    if (!logInitialized) { el.textContent = ''; logInitialized = true; }
+    const atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+    const html = lines.map(l => formatLogLine(l)).join('\n');
+    el.insertAdjacentHTML('beforeend', (el.textContent ? '\n' : '') + html);
+    // Cap node count to keep DOM small
+    if (el.childNodes.length > MAX_LOG_NODES * 2) {
+        const excess = el.childNodes.length - MAX_LOG_NODES;
+        for (let i = 0; i < excess; i++) el.removeChild(el.firstChild);
+    }
+    if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('log-console').textContent = 'Configure both players and click "Run Simulation".';
+    logInitialized = false;
+    clientLogSeq = 0;
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function formatElapsed(seconds) {
+    if (seconds < 60) return Math.round(seconds) + 's';
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    if (m < 60) return `${m}m ${s}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+}
+
+// Resume if a simulation is already running
+(async function checkStatus() {
+    try {
+        const res = await fetch('/api/simulate/status');
+        const data = await res.json();
+        if (data.status === 'running') {
+            setRunning(true);
+            if (typeof data.log_seq === 'number') clientLogSeq = data.log_seq;
+            updateDashboard(data);
+            connectSSE();
+        }
+    } catch (e) {}
+})();
+</script>
+
+</body>
+</html>

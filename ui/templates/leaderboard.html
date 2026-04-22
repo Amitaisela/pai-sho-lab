@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Leaderboard — Skud Pai Sho</title>
+    <style>
+      :root {
+        --bg: #161512; --panel: #262421; --panel-hover: #302e2c;
+        --border: #3a3835; --text: #bababa; --text-dim: #8b8987;
+        --text-bright: #e0e0e0; --accent: #629924; --p1: #4a90d9; --p2: #d94a4a;
+        --radius: 4px;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        background: var(--bg); color: var(--text);
+        font-family: 'Noto Sans', 'Segoe UI', Roboto, sans-serif;
+        font-size: 14px; min-height: 100vh;
+      }
+      header {
+        width: 100%; height: 44px; background: var(--panel);
+        display: flex; align-items: center; gap: 12px;
+        padding: 0 16px; border-bottom: 1px solid var(--border);
+      }
+      .logo { font-size: 1.1rem; font-weight: 700; color: var(--text-bright); }
+      .logo span { font-weight: 400; color: var(--text-dim); }
+      .btn {
+        background: var(--panel-hover); border: none; color: var(--text);
+        font-size: .8rem; font-weight: 600; padding: 6px 14px;
+        border-radius: var(--radius); cursor: pointer; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+      }
+      .btn:hover { background: #403e3b; color: var(--text-bright); }
+      .page { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+      .filters { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+      .filters label { font-size: 0.85rem; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+      table {
+        width: 100%; border-collapse: collapse; background: var(--panel);
+        border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+      }
+      th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+      th { background: var(--panel-hover); color: var(--text-bright); font-weight: 700;
+           text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; }
+      tr:last-child td { border-bottom: none; }
+      tr.human { background: rgba(74, 144, 217, 0.06); }
+      .rank { font-weight: 700; color: var(--text-dim); width: 40px; }
+      .rating { font-weight: 700; color: var(--accent); }
+      .badge {
+        display: inline-block; padding: 1px 6px; border-radius: 3px;
+        font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em;
+        background: var(--p1); color: #fff; margin-left: 6px;
+      }
+      .section-title {
+        font-size: .8rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .08em; color: var(--text-dim); margin: 32px 0 10px;
+      }
+      .empty { padding: 24px; text-align: center; color: var(--text-dim); }
+      .hist-row { font-size: 0.8rem; }
+      .hist-row td { color: var(--text-dim); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">Skud <span>Pai Sho</span></div>
+    <a href="/" class="btn">Game</a>
+    <a href="/train" class="btn">Train</a>
+    <a href="/simulate" class="btn">Simulate</a>
+    <a href="/guide" class="btn">Guide</a>
+    <div style="margin-left:auto; font-weight:600; color: var(--text-bright);">Leaderboard</div>
+</header>
+
+<div class="page">
+    <div class="filters">
+        <label><input type="checkbox" id="show-bots" checked> Bots</label>
+        <label><input type="checkbox" id="show-humans" checked> Humans</label>
+        <button class="btn" onclick="loadLeaderboard()" style="margin-left:auto">Refresh</button>
+    </div>
+
+    <table id="lb-table">
+        <thead>
+            <tr>
+                <th class="rank">#</th>
+                <th>Player</th>
+                <th>Rating</th>
+                <th>Games</th>
+                <th>W</th>
+                <th>L</th>
+                <th>D</th>
+            </tr>
+        </thead>
+        <tbody id="lb-body"></tbody>
+    </table>
+
+    <div class="section-title">Archived Ratings (past weight versions)</div>
+    <table id="hist-table">
+        <thead>
+            <tr>
+                <th>Agent</th>
+                <th>Rating (at archive)</th>
+                <th>Games</th>
+                <th>Archived</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody id="hist-body"></tbody>
+    </table>
+</div>
+
+<script>
+async function loadLeaderboard() {
+    const res = await fetch('/api/elo/leaderboard');
+    const data = await res.json();
+    const rows = data.rows || [];
+    const hist = data.history || [];
+    const showBots = document.getElementById('show-bots').checked;
+    const showHumans = document.getElementById('show-humans').checked;
+
+    const filtered = rows.filter(r => (r.is_human && showHumans) || (!r.is_human && showBots));
+    const body = document.getElementById('lb-body');
+    if (filtered.length === 0) {
+        body.innerHTML = '<tr><td colspan="7" class="empty">No ratings yet — play some rated games.</td></tr>';
+    } else {
+        body.innerHTML = filtered.map((r, i) => `
+            <tr class="${r.is_human ? 'human' : ''}">
+                <td class="rank">${i + 1}</td>
+                <td>${escapeHtml(r.display_name)}${r.is_human ? '<span class="badge">HUMAN</span>' : ''}</td>
+                <td class="rating">${r.rating}</td>
+                <td>${r.games}</td>
+                <td>${r.wins}</td>
+                <td>${r.losses}</td>
+                <td>${r.draws}</td>
+            </tr>`).join('');
+    }
+
+    const histBody = document.getElementById('hist-body');
+    if (hist.length === 0) {
+        histBody.innerHTML = '<tr><td colspan="5" class="empty">No archived ratings yet.</td></tr>';
+    } else {
+        histBody.innerHTML = hist.slice().reverse().map(h => `
+            <tr class="hist-row">
+                <td>${escapeHtml(h.agent)}</td>
+                <td>${h.rating}</td>
+                <td>${h.games || 0}</td>
+                <td>${h.archived_at ? new Date(h.archived_at * 1000).toLocaleString() : ''}</td>
+                <td>${escapeHtml(h.reason || '')}</td>
+            </tr>`).join('');
+    }
+}
+
+function escapeHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('show-bots').addEventListener('change', loadLeaderboard);
+document.getElementById('show-humans').addEventListener('change', loadLeaderboard);
+
+loadLeaderboard();
+</script>
+
+</body>
+</html>

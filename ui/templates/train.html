@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Train Models — Skud Pai Sho</title>
+    <style>
+        :root {
+          --bg:        #161512;
+          --bg-light:  #1d1b18;
+          --panel:     #262421;
+          --panel-hover: #302e2c;
+          --border:    #3a3835;
+          --text:      #bababa;
+          --text-dim:  #8b8987;
+          --text-bright: #e0e0e0;
+          --accent:    #629924;
+          --accent-hover: #7ab82e;
+          --link:      #81b64c;
+          --p1:       #4a90d9;
+          --p2:       #d94a4a;
+          --radius: 4px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Noto Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+          font-size: 14px;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* ── Header ── */
+        header {
+          width: 100%;
+          height: 44px;
+          background: var(--panel);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          letter-spacing: .02em;
+        }
+        .logo span { font-weight: 400; color: var(--text-dim); }
+
+        .btn {
+          background: var(--panel-hover);
+          border: none;
+          color: var(--text);
+          font-family: inherit;
+          font-size: .8rem;
+          font-weight: 600;
+          padding: 6px 14px;
+          border-radius: var(--radius);
+          cursor: pointer;
+          transition: background .15s, color .15s;
+          text-decoration: none;
+          display: inline-block;
+          line-height: 1.2;
+          letter-spacing: .02em;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn:hover { background: #403e3b; color: var(--text-bright); }
+        .btn-accent { background: var(--accent); color: #fff; }
+        .btn-accent:hover { background: var(--accent-hover); }
+        .btn-danger { background: #8b2020; color: #eaa; }
+        .btn-danger:hover { background: #a52a2a; color: #fff; }
+        .btn:disabled { opacity: .4; cursor: default; pointer-events: none; }
+
+        /* ── Page layout ── */
+        .page {
+          display: flex;
+          flex: 1;
+          max-width: 1400px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 24px 16px;
+          gap: 24px;
+        }
+
+        /* ── Left panel ── */
+        .config-panel {
+          width: 320px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .section {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 16px;
+        }
+        .section-title {
+          font-size: .75rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: .08em;
+          color: var(--text-dim);
+          margin-bottom: 12px;
+        }
+
+        /* Model selector cards */
+        .model-cards { display: flex; flex-direction: column; gap: 8px; }
+        .model-card {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          border-radius: var(--radius);
+          border: 1px solid var(--border);
+          background: var(--bg-light);
+          cursor: pointer;
+          transition: border-color .15s, background .15s;
+        }
+        .model-card:hover { background: var(--panel-hover); }
+        .model-card.selected {
+          border-color: var(--accent);
+          background: rgba(98, 153, 36, 0.08);
+        }
+        .model-card input[type="radio"] { display: none; }
+        .model-radio {
+          width: 16px; height: 16px;
+          border-radius: 50%;
+          border: 2px solid var(--border);
+          flex-shrink: 0;
+          position: relative;
+          transition: border-color .15s;
+        }
+        .model-card.selected .model-radio {
+          border-color: var(--accent);
+        }
+        .model-card.selected .model-radio::after {
+          content: '';
+          position: absolute;
+          top: 3px; left: 3px;
+          width: 6px; height: 6px;
+          border-radius: 50%;
+          background: var(--accent);
+        }
+        .model-info { flex: 1; }
+        .model-name { font-weight: 600; font-size: .9rem; color: var(--text-bright); }
+        .model-desc { font-size: .7rem; color: var(--text-dim); margin-top: 2px; }
+
+        /* Hyperparameter form */
+        .param-group { display: flex; flex-direction: column; gap: 10px; }
+        .param-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        .param-label {
+          font-size: .8rem;
+          color: var(--text);
+          cursor: help;
+          flex-shrink: 0;
+        }
+        .param-input {
+          background: var(--bg);
+          border: 1px solid var(--border);
+          color: var(--text-bright);
+          border-radius: var(--radius);
+          padding: 5px 8px;
+          font-family: inherit;
+          font-size: .8rem;
+          width: 120px;
+          text-align: right;
+          transition: border-color .15s;
+        }
+        .param-input:focus { border-color: var(--accent); outline: none; }
+
+        .param-row.checkbox {
+          justify-content: flex-start;
+          gap: 8px;
+        }
+        .param-row.checkbox input[type="checkbox"] {
+          accent-color: var(--accent);
+          width: 16px; height: 16px;
+          cursor: pointer;
+        }
+
+        .action-buttons { display: flex; gap: 8px; }
+        .action-buttons .btn { flex: 1; justify-content: center; padding: 8px 14px; }
+
+        /* ── Config editor panel ── */
+        .config-editor-panel {
+          width: 340px;
+          flex-shrink: 0;
+          display: none;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .config-editor-panel.visible { display: flex; }
+        .config-editor-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .config-editor-path {
+          font-size: .7rem;
+          color: var(--text-dim);
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+        }
+        .config-textarea {
+          flex: 1;
+          background: var(--bg);
+          border: 1px solid var(--border);
+          color: var(--text-bright);
+          border-radius: var(--radius);
+          padding: 10px;
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+          font-size: .75rem;
+          line-height: 1.5;
+          resize: none;
+          min-height: 400px;
+          tab-size: 4;
+          transition: border-color .15s;
+        }
+        .config-textarea:focus { border-color: var(--accent); outline: none; }
+        .config-save-status {
+          font-size: .7rem;
+          color: var(--text-dim);
+          min-height: 1.2em;
+        }
+        .config-save-status.saved { color: var(--accent); }
+        .config-save-status.error { color: var(--p2); }
+
+        /* ── Right panel (dashboard) ── */
+        .dashboard {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          min-width: 0;
+        }
+
+        /* Status banner */
+        .status-banner {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 14px;
+          border-radius: var(--radius);
+          border: 1px solid var(--border);
+          background: var(--panel);
+        }
+        .status-dot {
+          width: 10px; height: 10px;
+          border-radius: 50%;
+          flex-shrink: 0;
+        }
+        .status-dot.idle { background: var(--text-dim); }
+        .status-dot.running { background: var(--accent); animation: pulse 1.5s infinite; }
+        .status-dot.completed { background: var(--p1); }
+        .status-dot.error { background: var(--p2); }
+        .status-dot.stopping { background: #d9a54a; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+        .status-text { font-size: .9rem; font-weight: 600; color: var(--text-bright); }
+        .status-detail { font-size: .8rem; color: var(--text-dim); margin-left: auto; }
+
+        /* Progress bar */
+        .progress-wrap {
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          height: 28px;
+          position: relative;
+          overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+          transition: width .3s ease;
+          border-radius: var(--radius);
+        }
+        .progress-text {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: .75rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          text-shadow: 0 1px 3px rgba(0,0,0,.6);
+        }
+
+        /* Stats grid */
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 8px;
+        }
+        .stat-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 10px 12px;
+        }
+        .stat-label {
+          font-size: .65rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: .06em;
+          color: var(--text-dim);
+          margin-bottom: 4px;
+        }
+        .stat-value {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+        }
+
+        /* Model file info */
+        .file-info {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          font-size: .8rem;
+          color: var(--text-dim);
+          padding: 10px 14px;
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+        }
+        .file-info strong { color: var(--text); }
+
+        /* Log console */
+        .log-wrap {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 200px;
+        }
+        .log-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 6px;
+        }
+        .log-header .section-title { margin-bottom: 0; }
+        .log-console {
+          flex: 1;
+          background: var(--bg);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 10px;
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+          font-size: .72rem;
+          line-height: 1.5;
+          overflow-y: auto;
+          max-height: 350px;
+          white-space: pre-wrap;
+          word-break: break-all;
+          color: var(--text-dim);
+        }
+        .log-console .log-highlight { color: var(--accent); }
+        .log-console .log-error { color: var(--p2); }
+        .log-console .log-info { color: var(--text); }
+
+        /* ── Architecture overview panel ── */
+        .arch-panel {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .arch-header {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 12px;
+        }
+        .arch-name {
+          font-size: 1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          letter-spacing: .01em;
+        }
+        .arch-tagline {
+          font-size: .75rem;
+          color: var(--text-dim);
+          font-style: italic;
+        }
+        .arch-body {
+          font-size: .85rem;
+          line-height: 1.55;
+          color: var(--text);
+        }
+        .arch-body.empty { color: var(--text-dim); font-style: italic; }
+
+        /* ── Test results panel ── */
+        .test-panel {
+          display: none;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .test-panel.visible { display: flex; }
+        .test-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+        .test-console {
+          background: var(--bg);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 10px;
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+          font-size: .72rem;
+          line-height: 1.5;
+          overflow-y: auto;
+          max-height: 350px;
+          white-space: pre-wrap;
+          word-break: break-all;
+          color: var(--text-dim);
+        }
+        .test-console .t-pass { color: var(--accent); }
+        .test-console .t-fail { color: var(--p2); }
+        .test-console .t-heading { color: var(--text-bright); font-weight: 700; }
+        .test-console .t-section { color: var(--p1); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">Skud <span>Pai Sho</span></div>
+        <a href="/" class="btn">Game</a>
+        <a href="/simulate" class="btn">Simulate</a>
+        <a href="/leaderboard" class="btn">Leaderboard</a>
+        <a href="/guide" class="btn">Guide</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size:.85rem; font-weight:600; color:var(--text-bright);">Model Training</div>
+        <button type="button" class="btn" id="run-tests-btn" onclick="runTests()">Run Tests</button>
+    </div>
+</header>
+
+<div class="page">
+    <!-- Left: Configuration -->
+    <div class="config-panel">
+        <!-- Model selector -->
+        <div class="section">
+            <div class="section-title">Select Model</div>
+            <div class="model-cards" id="model-cards">
+                <!-- Populated dynamically from /api/agents/registry -->
+            </div>
+        </div>
+
+        <!-- Hyperparameters -->
+        <div class="section">
+            <div class="section-title">Hyperparameters</div>
+            <div class="param-group" id="params-form"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="action-buttons">
+            <button type="button" class="btn btn-accent" id="start-btn" onclick="startTraining()">Start Training</button>
+            <button type="button" class="btn btn-danger" id="stop-btn" onclick="stopTraining()" disabled>Stop</button>
+        </div>
+
+        <!-- Model file info -->
+        <div class="section">
+            <div class="section-title">Saved Model</div>
+            <div class="file-info" id="model-file-info">
+                <span>Select a model to view info</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Middle: Config file editor (shown for models with config files) -->
+    <div class="config-editor-panel" id="config-editor-panel">
+        <div class="section" style="flex:1; display:flex; flex-direction:column;">
+            <div class="config-editor-header">
+                <div class="section-title">Config File</div>
+                <button class="btn" style="padding:3px 10px; font-size:.7rem;" onclick="saveConfig()">Save</button>
+            </div>
+            <div class="config-editor-path" id="config-path"></div>
+            <textarea class="config-textarea" id="config-textarea" spellcheck="false"></textarea>
+            <div class="config-save-status" id="config-save-status"></div>
+        </div>
+    </div>
+
+    <!-- Right: Dashboard -->
+    <div class="dashboard">
+        <!-- Architecture overview -->
+        <div class="arch-panel section" id="arch-panel">
+            <div class="section-title">Model Architecture</div>
+            <div class="arch-header">
+                <div class="arch-name" id="arch-name">--</div>
+                <div class="arch-tagline" id="arch-tagline"></div>
+            </div>
+            <div class="arch-body empty" id="arch-body">Select a model to see how it works.</div>
+        </div>
+
+        <!-- Test results -->
+        <div class="test-panel section" id="test-panel">
+            <div class="test-header">
+                <div class="section-title">Test Results</div>
+                <div style="display:flex; gap:6px; align-items:center;">
+                    <span id="test-status-label" style="font-size:.75rem; color:var(--text-dim);"></span>
+                    <button class="btn" style="padding:3px 8px; font-size:.7rem;" onclick="closeTests()">Close</button>
+                </div>
+            </div>
+            <div class="test-console" id="test-console"></div>
+        </div>
+
+        <!-- Status -->
+        <div class="status-banner">
+            <div class="status-dot idle" id="status-dot"></div>
+            <span class="status-text" id="status-text">Idle</span>
+            <span class="status-detail" id="status-detail"></span>
+        </div>
+
+        <!-- Progress -->
+        <div class="progress-wrap">
+            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+            <div class="progress-text" id="progress-text">0%</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <!-- Log -->
+        <div class="log-wrap">
+            <div class="log-header">
+                <div class="section-title">Training Log</div>
+                <button class="btn" style="padding:3px 8px; font-size:.7rem;" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="log-console" id="log-console">Waiting for training to start...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Init data bundled with the HTML response to avoid extra roundtrips. ──
+const INIT_DATA = {{ init_data|tojson }};
+const MODEL_INFO_CACHE = INIT_DATA.model_infos || {};
+const CONFIG_CACHE = INIT_DATA.configs || {};
+
+// ── Model parameter definitions (populated from registry) ──
+let MODEL_PARAMS = {};
+let MODEL_META = {};
+let MODELS_WITH_CONFIG = new Set();
+
+// ── State ──
+let selectedModel = null;
+let eventSource = null;
+let isRunning = false;
+let configDirty = false;
+
+// ── Build UI from embedded init data (no fetch needed). ──
+(function buildFromInit() {
+    const container = document.getElementById('model-cards');
+    container.innerHTML = '';
+    INIT_DATA.train.forEach((agent, i) => {
+        MODEL_PARAMS[agent.key] = agent.training_params;
+        MODEL_META[agent.key] = {
+            display_name: agent.display_name,
+            description: agent.description || '',
+            architecture: agent.architecture || '',
+        };
+        if (agent.config_file) MODELS_WITH_CONFIG.add(agent.key);
+
+        const label = document.createElement('label');
+        label.className = 'model-card' + (i === 0 ? ' selected' : '');
+        label.dataset.model = agent.key;
+        label.setAttribute('onclick', `selectModel('${agent.key}')`);
+        label.innerHTML = `
+            <input type="radio" name="model" value="${agent.key}" ${i === 0 ? 'checked' : ''}>
+            <div class="model-radio"></div>
+            <div class="model-info">
+                <div class="model-name">${agent.display_name}</div>
+                <div class="model-desc">${agent.description}</div>
+            </div>
+        `;
+        container.appendChild(label);
+    });
+
+    if (INIT_DATA.train.length > 0) {
+        selectedModel = INIT_DATA.train[0].key;
+        renderParams();
+        renderArchitecture();
+        renderModelInfo(MODEL_INFO_CACHE[selectedModel]);
+        toggleConfigEditor(selectedModel);
+    }
+})();
+
+// ── Model selection ──
+function selectModel(model) {
+    selectedModel = model;
+    document.querySelectorAll('.model-card').forEach(c => {
+        c.classList.toggle('selected', c.dataset.model === model);
+    });
+    renderParams();
+    renderArchitecture();
+    if (MODEL_INFO_CACHE[model]) {
+        renderModelInfo(MODEL_INFO_CACHE[model]);
+    } else {
+        fetchModelInfo();
+    }
+    toggleConfigEditor(model);
+}
+
+// ── Render the architecture overview for the currently selected model ──
+function renderArchitecture() {
+    const meta = MODEL_META[selectedModel] || {};
+    const nameEl = document.getElementById('arch-name');
+    const taglineEl = document.getElementById('arch-tagline');
+    const bodyEl = document.getElementById('arch-body');
+    nameEl.textContent = meta.display_name || '--';
+    taglineEl.textContent = meta.description || '';
+    if (meta.architecture) {
+        bodyEl.textContent = meta.architecture;
+        bodyEl.classList.remove('empty');
+    } else {
+        bodyEl.textContent = 'No architecture description available.';
+        bodyEl.classList.add('empty');
+    }
+}
+
+// ── Render hyperparameter form ──
+function renderParams() {
+    const form = document.getElementById('params-form');
+    const params = MODEL_PARAMS[selectedModel] || [];
+    form.innerHTML = params.map(p => {
+        if (p.type === 'checkbox') {
+            return `<div class="param-row checkbox">
+                <input type="checkbox" id="param-${p.key}" ${p.default ? 'checked' : ''} title="${p.tooltip}">
+                <label class="param-label" for="param-${p.key}" title="${p.tooltip}">${p.label}</label>
+            </div>`;
+        }
+        const attrs = [
+            `type="${p.type}"`,
+            `id="param-${p.key}"`,
+            `value="${p.default}"`,
+            `title="${p.tooltip}"`,
+            `class="param-input"`,
+        ];
+        if (p.step !== undefined) attrs.push(`step="${p.step}"`);
+        if (p.min !== undefined) attrs.push(`min="${p.min}"`);
+        if (p.max !== undefined) attrs.push(`max="${p.max}"`);
+        return `<div class="param-row">
+            <label class="param-label" for="param-${p.key}" title="${p.tooltip}">${p.label}</label>
+            <input ${attrs.join(' ')}>
+        </div>`;
+    }).join('');
+}
+
+// ── Collect form values ──
+function collectParams() {
+    const defs = MODEL_PARAMS[selectedModel] || [];
+    const params = {};
+    defs.forEach(p => {
+        const el = document.getElementById(`param-${p.key}`);
+        if (!el) return;
+        if (p.type === 'checkbox') {
+            params[p.key] = el.checked;
+        } else if (p.type === 'number') {
+            params[p.key] = parseFloat(el.value);
+        } else {
+            params[p.key] = el.value;
+        }
+    });
+    return params;
+}
+
+// ── Render model file info from a cached object. ──
+function renderModelInfo(info) {
+    const el = document.getElementById('model-file-info');
+    if (!info) {
+        el.innerHTML = '<span>Select a model to view info</span>';
+        return;
+    }
+    if (!info.exists) {
+        el.innerHTML = `<span>No saved model found</span><br><span style="font-size:.7rem">Path: <strong>${info.path || 'N/A'}</strong></span>`;
+    } else {
+        el.innerHTML = `
+            <span><strong>Path:</strong> ${info.path}</span>
+            <span><strong>Size:</strong> ${info.size_human}</span>
+            <span><strong>Modified:</strong> ${info.modified}</span>
+        `;
+    }
+}
+
+// ── Fetch latest model file info (e.g. after training completes). ──
+async function fetchModelInfo() {
+    try {
+        const res = await fetch(`/api/training/model_info?model=${selectedModel}`);
+        const info = await res.json();
+        MODEL_INFO_CACHE[selectedModel] = info;
+        renderModelInfo(info);
+    } catch (e) {
+        document.getElementById('model-file-info').innerHTML = '<span>Could not fetch model info</span>';
+    }
+}
+
+// ── Start training ──
+async function startTraining() {
+    if (isRunning) return;
+    // Auto-save config file if it was edited
+    if (MODELS_WITH_CONFIG.has(selectedModel) && configDirty) {
+        await saveConfig();
+    }
+    const params = collectParams();
+    try {
+        const res = await fetch('/api/training/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ model: selectedModel, params }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            alert(data.error || 'Failed to start training');
+            return;
+        }
+        setRunning(true);
+        clearLog();
+        connectSSE();
+    } catch (e) {
+        alert('Error starting training: ' + e.message);
+    }
+}
+
+// ── Stop training ──
+async function stopTraining() {
+    try {
+        await fetch('/api/training/stop', { method: 'POST' });
+    } catch (e) {
+        // ignore
+    }
+}
+
+// ── SSE connection ──
+function connectSSE() {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    eventSource = new EventSource('/api/training/stream?since=' + (clientLogSeq|0));
+    eventSource.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (typeof data.log_seq === 'number') clientLogSeq = data.log_seq;
+        updateDashboard(data);
+        if (data.status !== 'running' && data.status !== 'stopping') {
+            eventSource.close();
+            eventSource = null;
+            setRunning(false);
+            fetchModelInfo();
+        }
+    };
+    eventSource.onerror = () => {
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        setRunning(false);
+    };
+}
+
+// ── UI state toggle ──
+function setRunning(running) {
+    isRunning = running;
+    document.getElementById('start-btn').disabled = running;
+    document.getElementById('stop-btn').disabled = !running;
+    // Disable config while running
+    document.querySelectorAll('.model-card').forEach(c => c.style.pointerEvents = running ? 'none' : '');
+    document.querySelectorAll('.param-input, .param-row input[type="checkbox"]').forEach(el => el.disabled = running);
+    document.getElementById('config-textarea').disabled = running;
+}
+
+// ── Update dashboard from SSE data ──
+function updateDashboard(data) {
+    // Status
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + (data.status || 'idle');
+    const labels = { idle: 'Idle', running: 'Training...', completed: 'Completed', error: 'Error', stopping: 'Stopping...' };
+    document.getElementById('status-text').textContent = labels[data.status] || data.status;
+    document.getElementById('status-detail').textContent = data.elapsed ? formatElapsed(data.elapsed) : '';
+
+    // Progress
+    const total = data.total_episodes || 1;
+    const current = data.current_episode || 0;
+    const pct = Math.min(100, Math.round((current / total) * 100));
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = `${current} / ${total}  (${pct}%)`;
+
+    // Stats
+    renderStats(data);
+
+    // Log
+    if (data.new_log_lines && data.new_log_lines.length > 0) {
+        appendLog(data.new_log_lines);
+    } else if (data.log_lines && data.log_lines.length > 0 && !logInitialized) {
+        appendLog(data.log_lines);
+    }
+}
+
+// ── Render stats grid ──
+function renderStats(data) {
+    const grid = document.getElementById('stats-grid');
+    const s = data.parsed_stats || {};
+    let cards = [];
+
+    if (data.model === 'monte_carlo') {
+        cards = [
+            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
+            { label: 'Q-Table Size', value: s.q_table_size !== undefined ? s.q_table_size.toLocaleString() : '--' },
+            { label: 'Last Outcome', value: s.outcome || '--' },
+            { label: 'Steps', value: s.steps !== undefined ? s.steps.toLocaleString() : '--' },
+            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
+            { label: 'Q-Table Delta', value: s.q_table_delta || '--' },
+        ];
+    } else if (data.model === 'td_learning') {
+        cards = [
+            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
+            { label: 'P1 Wins', value: s.p1_wins !== undefined ? s.p1_wins : '--' },
+            { label: 'P2 Wins', value: s.p2_wins !== undefined ? s.p2_wins : '--' },
+            { label: 'Draws', value: s.draws !== undefined ? s.draws : '--' },
+            { label: 'Last Outcome', value: s.outcome || '--' },
+            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
+        ];
+    } else if (data.model === 'neat') {
+        cards = [
+            { label: 'Generation', value: s.episode !== undefined ? s.episode : '--' },
+        ];
+    } else if (data.model === 'ppo' || data.model === 'set_transformer') {
+        cards = [
+            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
+            { label: 'P1 Wins', value: s.p1_wins !== undefined ? s.p1_wins : '--' },
+            { label: 'P2 Wins', value: s.p2_wins !== undefined ? s.p2_wins : '--' },
+            { label: 'Draws', value: s.draws !== undefined ? s.draws : '--' },
+            { label: 'Policy Loss', value: s.policy_loss !== undefined ? s.policy_loss.toFixed(4) : '--' },
+            { label: 'Value Loss', value: s.value_loss !== undefined ? s.value_loss.toFixed(4) : '--' },
+            { label: 'Last Outcome', value: s.outcome || '--' },
+            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
+        ];
+    } else if (data.model === 'nneu_basic') {
+        const phaseLabel = s.phase === 'generate' ? 'Generate' :
+                           s.phase === 'train' ? 'Train' : '--';
+        const counterLabel = s.phase === 'generate' ? 'Game' :
+                             s.phase === 'train' ? 'Epoch' : 'Step';
+        cards = [
+            { label: 'Phase', value: phaseLabel },
+            { label: counterLabel, value: s.episode !== undefined ? `${s.episode} / ${s.total ?? '?'}` : '--' },
+            { label: 'Loss', value: s.loss !== undefined ? Number(s.loss).toFixed(4) : '--' },
+            { label: 'Eval Winrate', value: s.winrate !== undefined ? (Number(s.winrate) * 100).toFixed(1) + '%' : '--' },
+            { label: 'Eval vs', value: s.opponent || '--' },
+            { label: 'Last Game Steps', value: s.steps !== undefined ? s.steps : '--' },
+            { label: 'Positions Kept', value: s.kept !== undefined ? s.kept : '--' },
+            { label: 'Phase Time', value: s.epoch_time !== undefined ? Number(s.epoch_time).toFixed(2) + 's'
+                                          : s.elapsed !== undefined ? Number(s.elapsed).toFixed(2) + 's'
+                                          : '--' },
+        ];
+    } else if (data.model === 'cnn_basic') {
+        cards = [
+            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
+            { label: 'P1 Wins', value: s.p1_wins !== undefined ? s.p1_wins : '--' },
+            { label: 'P2 Wins', value: s.p2_wins !== undefined ? s.p2_wins : '--' },
+            { label: 'Draws', value: s.draws !== undefined ? s.draws : '--' },
+            { label: 'Loss', value: s.loss !== undefined ? s.loss.toFixed(4) : '--' },
+            { label: 'Last Outcome', value: s.outcome || '--' },
+            { label: 'Steps', value: s.steps !== undefined ? s.steps.toLocaleString() : '--' },
+            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
+        ];
+    }
+
+    if (data.elapsed) {
+        cards.push({ label: 'Total Elapsed', value: formatElapsed(data.elapsed) });
+    }
+
+    grid.innerHTML = cards.map(c => `
+        <div class="stat-card">
+            <div class="stat-label">${c.label}</div>
+            <div class="stat-value">${c.value}</div>
+        </div>
+    `).join('');
+}
+
+// ── Render log ──
+const MAX_LOG_NODES = 600;
+let logInitialized = false;
+let clientLogSeq = 0;
+function formatLogLine(line) {
+    if (/error|fail/i.test(line)) return `<span class="log-error">${esc(line)}</span>`;
+    if (/episode|generation/i.test(line)) return `<span class="log-info">${esc(line)}</span>`;
+    if (/save|finished|best/i.test(line)) return `<span class="log-highlight">${esc(line)}</span>`;
+    return esc(line);
+}
+function appendLog(lines) {
+    const el = document.getElementById('log-console');
+    if (!logInitialized) { el.textContent = ''; logInitialized = true; }
+    const atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 40;
+    const html = lines.map(l => formatLogLine(l)).join('\n');
+    el.insertAdjacentHTML('beforeend', (el.textContent ? '\n' : '') + html);
+    if (el.childNodes.length > MAX_LOG_NODES * 2) {
+        const excess = el.childNodes.length - MAX_LOG_NODES;
+        for (let i = 0; i < excess; i++) el.removeChild(el.firstChild);
+    }
+    if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('log-console').textContent = 'Waiting for training to start...';
+    logInitialized = false;
+    clientLogSeq = 0;
+}
+
+// ── Helpers ──
+function esc(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatElapsed(seconds) {
+    if (seconds < 60) return Math.round(seconds) + 's';
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    if (m < 60) return `${m}m ${s}s`;
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}m`;
+}
+
+// ── Config editor ──
+function toggleConfigEditor(model) {
+    const panel = document.getElementById('config-editor-panel');
+    if (MODELS_WITH_CONFIG.has(model)) {
+        panel.classList.add('visible');
+        const cached = CONFIG_CACHE[model];
+        if (cached) {
+            const textarea = document.getElementById('config-textarea');
+            const pathEl = document.getElementById('config-path');
+            const statusEl = document.getElementById('config-save-status');
+            textarea.value = cached.content;
+            pathEl.textContent = cached.path;
+            statusEl.textContent = '';
+            statusEl.className = 'config-save-status';
+            configDirty = false;
+        } else {
+            fetchConfig(model);
+        }
+    } else {
+        panel.classList.remove('visible');
+    }
+}
+
+async function fetchConfig(model) {
+    const textarea = document.getElementById('config-textarea');
+    const pathEl = document.getElementById('config-path');
+    const statusEl = document.getElementById('config-save-status');
+    statusEl.textContent = '';
+    statusEl.className = 'config-save-status';
+    try {
+        const res = await fetch(`/api/training/config?model=${model}`);
+        const data = await res.json();
+        if (res.ok) {
+            textarea.value = data.content;
+            pathEl.textContent = data.path;
+            CONFIG_CACHE[model] = { content: data.content, path: data.path };
+            configDirty = false;
+        } else {
+            textarea.value = '';
+            pathEl.textContent = '';
+            statusEl.textContent = data.error || 'Could not load config';
+            statusEl.className = 'config-save-status error';
+        }
+    } catch (e) {
+        textarea.value = '';
+        statusEl.textContent = 'Failed to fetch config';
+        statusEl.className = 'config-save-status error';
+    }
+}
+
+async function saveConfig() {
+    const textarea = document.getElementById('config-textarea');
+    const statusEl = document.getElementById('config-save-status');
+    try {
+        const res = await fetch('/api/training/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ model: selectedModel, content: textarea.value }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            statusEl.textContent = 'Saved';
+            statusEl.className = 'config-save-status saved';
+            configDirty = false;
+        } else {
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'config-save-status error';
+        }
+    } catch (e) {
+        statusEl.textContent = 'Save failed: ' + e.message;
+        statusEl.className = 'config-save-status error';
+    }
+    setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'config-save-status'; }, 3000);
+}
+
+// Track unsaved changes
+document.getElementById('config-textarea').addEventListener('input', () => { configDirty = true; });
+
+// ── Test runner ──
+let testPollTimer = null;
+
+async function runTests() {
+    const btn = document.getElementById('run-tests-btn');
+    const panel = document.getElementById('test-panel');
+    const console_ = document.getElementById('test-console');
+    const label = document.getElementById('test-status-label');
+
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+    panel.classList.add('visible');
+    console_.innerHTML = 'Running tests...';
+    label.textContent = '';
+    label.style.color = 'var(--text-dim)';
+
+    try {
+        const res = await fetch('/api/tests/run', { method: 'POST' });
+        if (!res.ok) {
+            const d = await res.json();
+            console_.textContent = d.error || 'Failed to start tests';
+            btn.disabled = false;
+            btn.textContent = 'Run Tests';
+            return;
+        }
+    } catch (e) {
+        console_.textContent = 'Error: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = 'Run Tests';
+        return;
+    }
+
+    // Poll for completion
+    testPollTimer = setInterval(async () => {
+        try {
+            const res = await fetch('/api/tests/status');
+            const data = await res.json();
+            if (data.status !== 'running') {
+                clearInterval(testPollTimer);
+                testPollTimer = null;
+                btn.disabled = false;
+                btn.textContent = 'Run Tests';
+                renderTestOutput(data.output);
+                if (data.status === 'completed') {
+                    label.textContent = 'Passed';
+                    label.style.color = 'var(--accent)';
+                } else {
+                    label.textContent = 'Finished with errors';
+                    label.style.color = 'var(--p2)';
+                }
+                // Check for failures in the output
+                if (data.output && /\d+ failed/.test(data.output)) {
+                    const m = data.output.match(/(\d+) failed/);
+                    if (m && parseInt(m[1]) > 0) {
+                        label.textContent = m[1] + ' test(s) failed';
+                        label.style.color = 'var(--p2)';
+                    }
+                }
+            }
+        } catch (e) {}
+    }, 1000);
+}
+
+function renderTestOutput(text) {
+    const el = document.getElementById('test-console');
+    const lines = text.split('\n');
+    el.innerHTML = lines.map(line => {
+        const s = esc(line);
+        if (/^\s*\[PASS\]/.test(line)) return `<span class="t-pass">${s}</span>`;
+        if (/^\s*\[FAIL\]/.test(line)) return `<span class="t-fail">${s}</span>`;
+        if (/^={5,}/.test(line) || /TOTAL:/.test(line) || /TEST REPORT/.test(line)) return `<span class="t-heading">${s}</span>`;
+        if (/^\s*\[/.test(line)) return `<span class="t-section">${s}</span>`;
+        return s;
+    }).join('\n');
+    el.scrollTop = 0;
+}
+
+function closeTests() {
+    document.getElementById('test-panel').classList.remove('visible');
+}
+
+// ── Resume in-progress training using status embedded in the init payload. ──
+(function resumeIfRunning() {
+    const data = INIT_DATA.status;
+    if (data && data.status === 'running') {
+        selectedModel = data.model;
+        selectModel(data.model);
+        setRunning(true);
+        if (typeof data.log_seq === 'number') clientLogSeq = data.log_seq;
+        updateDashboard(data);
+        connectSSE();
+    }
+})();
+</script>
+
+</body>
+</html>

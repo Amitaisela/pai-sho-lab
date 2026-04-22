@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add a Model — Skud Pai Sho</title>
+    <style>
+        :root {
+          --bg:        #161512;
+          --bg-light:  #1d1b18;
+          --panel:     #262421;
+          --panel-hover: #302e2c;
+          --border:    #3a3835;
+          --text:      #bababa;
+          --text-dim:  #8b8987;
+          --text-bright: #e0e0e0;
+          --accent:    #629924;
+          --accent-hover: #7ab82e;
+          --link:      #81b64c;
+          --radius: 4px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Noto Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+          font-size: 14px;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+        }
+
+        header {
+          width: 100%;
+          height: 44px;
+          background: var(--panel);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          letter-spacing: .02em;
+        }
+        .logo span { font-weight: 400; color: var(--text-dim); }
+
+        .btn {
+          background: var(--panel-hover);
+          border: none;
+          color: var(--text);
+          font-family: inherit;
+          font-size: .8rem;
+          font-weight: 600;
+          padding: 6px 14px;
+          border-radius: var(--radius);
+          cursor: pointer;
+          transition: background .15s, color .15s;
+          letter-spacing: .02em;
+          text-decoration: none;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .btn:hover { background: #403e3b; color: var(--text-bright); }
+
+        .content {
+          max-width: 820px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 32px 24px 64px;
+        }
+
+        h1 {
+          font-size: 1.5rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          margin-bottom: 8px;
+        }
+        .subtitle {
+          color: var(--text-dim);
+          font-size: .9rem;
+          margin-bottom: 32px;
+        }
+
+        h2 {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          margin-top: 36px;
+          margin-bottom: 12px;
+          padding-bottom: 6px;
+          border-bottom: 1px solid var(--border);
+        }
+        h2 .step-num {
+          display: inline-block;
+          background: var(--accent);
+          color: #fff;
+          width: 24px;
+          height: 24px;
+          border-radius: 50%;
+          text-align: center;
+          line-height: 24px;
+          font-size: .8rem;
+          margin-right: 8px;
+        }
+
+        h3 {
+          font-size: .95rem;
+          font-weight: 600;
+          color: var(--text-bright);
+          margin-top: 20px;
+          margin-bottom: 8px;
+        }
+
+        p, li {
+          line-height: 1.65;
+          margin-bottom: 8px;
+        }
+        ul, ol {
+          padding-left: 24px;
+          margin-bottom: 12px;
+        }
+
+        code {
+          font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+          background: var(--bg-light);
+          padding: 1px 5px;
+          border-radius: 3px;
+          font-size: .85em;
+          color: var(--link);
+        }
+        pre {
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 16px;
+          overflow-x: auto;
+          margin: 12px 0 16px;
+          font-size: .82rem;
+          line-height: 1.55;
+        }
+        pre code {
+          background: none;
+          padding: 0;
+          color: var(--text);
+        }
+
+        .highlight { color: var(--link); }
+        .dim { color: var(--text-dim); }
+
+        .field-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 12px 0 16px;
+          font-size: .85rem;
+        }
+        .field-table th {
+          text-align: left;
+          padding: 8px 10px;
+          background: var(--bg-light);
+          color: var(--text-bright);
+          font-weight: 600;
+          border-bottom: 1px solid var(--border);
+        }
+        .field-table td {
+          padding: 7px 10px;
+          border-bottom: 1px solid var(--border);
+          vertical-align: top;
+        }
+        .field-table tr:last-child td { border-bottom: none; }
+
+        .tip {
+          background: #262a1f;
+          border-left: 3px solid var(--accent);
+          padding: 12px 16px;
+          margin: 16px 0;
+          border-radius: 0 var(--radius) var(--radius) 0;
+          font-size: .85rem;
+        }
+        .tip strong { color: var(--accent); }
+
+        .example-box {
+          background: var(--panel);
+          border: 1px solid var(--accent);
+          border-radius: var(--radius);
+          padding: 20px 24px;
+          margin-bottom: 32px;
+        }
+        .btn-accent {
+          background: var(--accent);
+          color: #fff;
+          font-weight: 600;
+        }
+        .btn-accent:hover {
+          background: var(--accent-hover);
+          color: #fff;
+        }
+
+        .template-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin: 16px 0 8px;
+        }
+        @media (max-width: 720px) {
+          .template-grid { grid-template-columns: 1fr; }
+        }
+        .template-card {
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 16px 18px;
+          display: flex;
+          flex-direction: column;
+        }
+        .template-card h3 {
+          margin-top: 0;
+          margin-bottom: 4px;
+          color: var(--text-bright);
+        }
+        .template-card .tagline {
+          font-size: .78rem;
+          color: var(--text-dim);
+          margin-bottom: 10px;
+          letter-spacing: .02em;
+          text-transform: uppercase;
+        }
+        .template-card p { font-size: .85rem; margin-bottom: 10px; }
+        .template-card .downloads {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          margin-top: auto;
+        }
+        .template-card .downloads .btn {
+          justify-content: flex-start;
+          font-size: .78rem;
+          padding: 6px 10px;
+        }
+
+        .compare-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 12px 0 16px;
+          font-size: .85rem;
+        }
+        .compare-table th, .compare-table td {
+          padding: 8px 10px;
+          border-bottom: 1px solid var(--border);
+          vertical-align: top;
+        }
+        .compare-table th {
+          text-align: left;
+          background: var(--bg-light);
+          color: var(--text-bright);
+          font-weight: 600;
+        }
+        .compare-table tr:last-child td { border-bottom: none; }
+        .compare-table td:first-child {
+          color: var(--text-dim);
+          font-weight: 600;
+          width: 22%;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-left">
+        <div class="logo">Skud <span>Pai Sho</span></div>
+        <a href="/" class="btn">Game</a>
+        <a href="/train" class="btn">Train</a>
+        <a href="/simulate" class="btn">Simulate</a>
+        <a href="/leaderboard" class="btn">Leaderboard</a>
+    </div>
+    <div style="font-size:.85rem; font-weight:600; color:var(--text-bright);">Adding a New Model</div>
+</header>
+
+<div class="content">
+    <h1>How to Add a New AI Model</h1>
+    <p class="subtitle">Three files. Zero plumbing. The game UI, training page, and simulator pick it up automatically.</p>
+
+    <!-- Download example -->
+    <div class="example-box">
+        <h2 style="margin-top:0; border-bottom:none; padding-bottom:0;">Download a Working Example</h2>
+        <p>Two starter templates ship with the project — pick the one that matches the kind of agent you want to build. Both are minimal, already registered, and runnable end-to-end.</p>
+
+        <div class="template-grid">
+            <div class="template-card">
+                <h3>Basic Minimax</h3>
+                <div class="tagline">Classical · Search-based</div>
+                <p>Depth-limited alpha-beta with a hand-crafted linear evaluator (harmony count, material, ring distance, opponent threat). No neural net, no gradients — just search + a few hardcoded weights.</p>
+                <div class="downloads">
+                    <a href="/api/example/basic_minimax.py" class="btn btn-accent" download>basic_minimax.py <span class="dim" style="font-weight:400;">— agent class</span></a>
+                    <a href="/api/example/registry.py" class="btn btn-accent" download>registry.py <span class="dim" style="font-weight:400;">— registration</span></a>
+                </div>
+            </div>
+
+            <div class="template-card">
+                <h3>Basic CNN</h3>
+                <div class="tagline">Learned · Value network</div>
+                <p>Tiny two-layer convolutional value network over an 8-channel 19×19 board tensor. Greedy 1-ply lookahead picks the move leading to the highest-valued successor state. Trained by self-play value-regression.</p>
+                <div class="downloads">
+                    <a href="/api/example/cnn_basic.py" class="btn btn-accent" download>cnn_basic.py <span class="dim" style="font-weight:400;">— agent class</span></a>
+                    <a href="/api/example/cnn_basic_training.py" class="btn btn-accent" download>cnn_basic_training.py <span class="dim" style="font-weight:400;">— training script</span></a>
+                    <a href="/api/example/registry.py" class="btn btn-accent" download>registry.py <span class="dim" style="font-weight:400;">— registration</span></a>
+                </div>
+            </div>
+        </div>
+
+        <h3 style="margin-top:20px;">Why two templates?</h3>
+        <p>The agent interface here (<code>choose_action(game)</code>) is deliberately loose — it doesn't care whether your decision comes from tree search, a neural net, a lookup table, or a coin flip. Shipping <em>both</em> a classical search agent and a learned value network makes that clear by example: each template demonstrates a different part of the plumbing (registry entries with/without training, config files, log parsers, weight persistence), and together they cover the two branches almost every new agent falls into. Copy the one that matches your idea; the other tells you what the <em>other</em> branch of the registry looks like.</p>
+
+        <h3>How they differ</h3>
+        <table class="compare-table">
+            <tr><th>Aspect</th><th>Basic Minimax</th><th>Basic CNN</th></tr>
+            <tr><td>Decision</td><td>Alpha-beta tree search to fixed depth</td><td>1-ply greedy over a learned state value</td></tr>
+            <tr><td>Evaluator</td><td>Hand-crafted linear sum of game features</td><td>Learned conv net over board tensor</td></tr>
+            <tr><td>Trainable?</td><td>No — weights are hardcoded constants</td><td>Yes — self-play value regression</td></tr>
+            <tr><td>Registry shape</td><td>No <code>training_script</code>, no <code>training_params</code></td><td>Full trainable entry with <code>log_parser</code> and <code>config_file</code></td></tr>
+            <tr><td>Dependencies</td><td>Pure Python + game engine</td><td>PyTorch, NumPy, saved <code>.pt</code> weights</td></tr>
+            <tr><td>Strength source</td><td>Search depth &amp; evaluator quality</td><td>Training data &amp; network capacity</td></tr>
+            <tr><td>Best starting point for…</td><td>Rule-driven agents, heuristic search, MCTS variants</td><td>Value nets, policy nets, any gradient-trained model</td></tr>
+        </table>
+
+        <p class="dim" style="font-size:.8rem; margin-bottom:0;">Swap the evaluator, widen the feature vector, change the net architecture, or replace the training loop — every extension point is isolated to one of these files.</p>
+    </div>
+
+    <!-- Overview -->
+    <h2><span class="step-num">1</span> Create the Agent Class</h2>
+
+    <p>Create a new file in <code>ai/rl/</code> (or <code>ai/classical/</code>). Your agent class must implement one method:</p>
+
+    <pre><code><span class="dim"># ai/rl/my_agent.py</span>
+
+class MyAgent:
+    def __init__(self, player=1, load=False, **kwargs):
+        <span class="dim"># Initialize your model / load weights when load=True</span>
+        ...
+
+    def <span class="highlight">choose_action</span>(self, game, verbose=False):
+        """Return one legal action: ('plant', flower, r, c) or ('arrange', fr, fc, tr, tc)."""
+        legal = game.get_legal_actions()
+        <span class="dim"># ... your logic ...</span>
+        return best_action</code></pre>
+
+    <h3>Interface requirements</h3>
+    <ul>
+        <li><code>choose_action(game, verbose=False)</code> &mdash; takes a <code>PaiShoGame</code> instance, returns an action tuple.</li>
+        <li>Constructor should accept <code>load=True</code> to restore pre-trained weights at play time.</li>
+        <li>If your model needs to know which player it is, accept <code>player=</code> in <code>__init__</code>. The system will set <code>agent.player</code> before each move if you set <code>"needs_player": True</code> in the registry.</li>
+    </ul>
+
+    <h3>Optional methods for training</h3>
+    <ul>
+        <li><code>save_model(path=None)</code> &mdash; persist weights to disk.</li>
+        <li><code>load_model(path=None)</code> &mdash; restore weights from disk.</li>
+    </ul>
+
+    <div class="tip">
+        <strong>Tip:</strong> Use <code>game.clone()</code> before simulating moves in search. Never mutate the original game object.
+    </div>
+
+    <!-- Step 2 -->
+    <h2><span class="step-num">2</span> Create a Training Script <span class="dim">(optional)</span></h2>
+
+    <p>If your model is trainable, add a script at <code>ai/training/my_agent_training.py</code>. It should:</p>
+    <ul>
+        <li>Accept hyperparameters as CLI arguments (e.g. <code>--n</code>, <code>--lr</code>, <code>--eps</code>).</li>
+        <li>Print progress to stdout so the training dashboard can parse it.</li>
+        <li>Save the trained model to <code>ai/params/MyAgent/</code>.</li>
+    </ul>
+
+    <h3>Stdout format for live progress</h3>
+    <p>The training dashboard parses stdout lines to show real-time stats. You can reuse an existing log format or add a new parser. The built-in parsers recognize these formats:</p>
+
+    <pre><code><span class="dim"># PPO / Set Transformer format (log_parser: "ppo")</span>
+Episode 100/5,000 | eps=0.28 | P1 wins in 234 steps | W1=55 W2=40 D=5 | PL=0.023 VL=0.156 | params=12,544 | 3.21s
+
+<span class="dim"># TD Learning format (log_parser: "td_learning")</span>
+Episode 100/5,000 | eps=0.28 | P1 wins in 234 steps | W1=55 W2=40 D=5 | 3.21s
+
+<span class="dim"># Monte Carlo format (log_parser: "monte_carlo")</span>
+Episode 100/1,000 | Eps: 0.95 | P1 wins in 312 steps | Q-Table: 45,231 (+128) | Took 1.23s
+
+<span class="dim"># NEAT format (log_parser: "neat")</span>
+Generation 25</code></pre>
+
+    <div class="tip">
+        <strong>Tip:</strong> The easiest path is to print in the PPO format and set <code>"log_parser": "ppo"</code> in the registry. If you need a custom format, add a regex + extractor function to <code>ui/training_manager.py</code>'s <code>_LOG_PARSERS</code> dict.
+    </div>
+
+    <!-- Step 3 -->
+    <h2><span class="step-num">3</span> Register in <code>ai/registry.py</code></h2>
+
+    <p>Add one dictionary entry to the <code>AGENTS</code> list. Here's a minimal example for a trainable agent:</p>
+
+    <pre><code>{
+    "key": "my_agent",                   <span class="dim"># unique identifier</span>
+    "display_name": "My Agent",          <span class="dim"># shown in UI</span>
+    "description": "Short description",  <span class="dim"># shown on model card</span>
+    "kind": "class",
+    "module": "ai.rl.my_agent",          <span class="dim"># Python import path</span>
+    "class_name": "MyAgent",             <span class="dim"># class to instantiate</span>
+    "play_kwargs": {"player": 1, "load": True},  <span class="dim"># constructor args for play</span>
+    "needs_player": True,                <span class="dim"># set agent.player each turn</span>
+    "play_params": [],                   <span class="dim"># runtime-tunable params (game UI)</span>
+    "model_path": "ai/params/MyAgent/model.pt",   <span class="dim"># where weights live</span>
+    "training_script": "ai/training/my_agent_training.py",
+    "training_params": [                 <span class="dim"># shown on training page</span>
+        {"key": "episodes", "label": "Episodes", "type": "number",
+         "default": 5000, "step": 500, "min": 1,
+         "tooltip": "Number of self-play episodes"},
+        {"key": "lr", "label": "Learning Rate", "type": "number",
+         "default": 0.001, "step": 0.0001, "min": 0.00001, "max": 0.1},
+        {"key": "resume", "label": "Resume", "type": "checkbox", "default": false,
+         "tooltip": "Continue from saved checkpoint"},
+    ],
+    "training_cli_map": {                <span class="dim"># param key -> CLI flag</span>
+        "episodes": "--n",
+        "lr": "--lr",
+        "resume": "--resume",
+    },
+    "total_episodes_key": "episodes",    <span class="dim"># drives the progress bar</span>
+    "log_parser": "ppo",                 <span class="dim"># reuse PPO's stdout parser</span>
+    "config_file": null,                 <span class="dim"># editable config file path, or null</span>
+}</code></pre>
+
+    <h3>Registry field reference</h3>
+    <table class="field-table">
+        <tr><th>Field</th><th>Description</th></tr>
+        <tr><td><code>key</code></td><td>Unique machine name, used in URLs and CLI specs.</td></tr>
+        <tr><td><code>display_name</code></td><td>Human-readable name shown in both UIs.</td></tr>
+        <tr><td><code>description</code></td><td>One-line description for model cards.</td></tr>
+        <tr><td><code>kind</code></td><td><code>"class"</code> for agents, <code>"function"</code> for standalone functions, <code>"inline"</code> for random.</td></tr>
+        <tr><td><code>module</code></td><td>Python import path (e.g. <code>ai.rl.my_agent</code>). Lazy-imported on first use.</td></tr>
+        <tr><td><code>class_name</code></td><td>Class to instantiate from the module.</td></tr>
+        <tr><td><code>play_kwargs</code></td><td>Dict passed to the constructor when loading for play.</td></tr>
+        <tr><td><code>needs_player</code></td><td>If <code>true</code>, the system sets <code>agent.player = current_player</code> before each move.</td></tr>
+        <tr><td><code>play_params</code></td><td>Runtime-tunable parameters shown in the game UI (e.g. time budget). Each entry has: <code>key</code>, <code>label</code>, <code>default</code>, <code>min</code>, <code>max</code>, <code>step</code>.</td></tr>
+        <tr><td><code>model_path</code></td><td>Relative path to saved weights. Used by the training dashboard to show file info. <code>null</code> if none.</td></tr>
+        <tr><td><code>training_script</code></td><td>Relative path to the training script. <code>null</code> if not trainable (agent won't appear on training page).</td></tr>
+        <tr><td><code>training_params</code></td><td>Hyperparameter definitions for the training UI. Each entry: <code>key</code>, <code>label</code>, <code>type</code> (<code>"number"</code>, <code>"text"</code>, or <code>"checkbox"</code>), <code>default</code>, and optional <code>step</code>, <code>min</code>, <code>max</code>, <code>tooltip</code>.</td></tr>
+        <tr><td><code>training_cli_map</code></td><td>Maps <code>training_params</code> keys to CLI flags for the training script.</td></tr>
+        <tr><td><code>total_episodes_key</code></td><td>Which <code>training_params</code> key represents the total count (drives the progress bar).</td></tr>
+        <tr><td><code>log_parser</code></td><td>Key into the parser registry in <code>training_manager.py</code>. Reuse <code>"ppo"</code>, <code>"td_learning"</code>, <code>"monte_carlo"</code>, <code>"neat"</code>, or add your own.</td></tr>
+        <tr><td><code>config_file</code></td><td>Path to an editable config file (shown in training UI). <code>null</code> for most agents.</td></tr>
+    </table>
+
+    <!-- Step 4 (that's it) -->
+    <h2>That's It</h2>
+    <p>Once those three pieces are in place:</p>
+    <ul>
+        <li>Your agent appears in the <strong>game page</strong> player dropdowns automatically.</li>
+        <li>If trainable, it appears on the <strong>training page</strong> with its own model card and hyperparameter form.</li>
+        <li>The <strong>simulator</strong> (<code>python simulator.py --p1 my_agent</code>) can load it with no changes.</li>
+    </ul>
+
+    <h3>Testing your agent</h3>
+    <pre><code><span class="dim"># Quick check: run a local game</span>
+python simulator.py --mode local --p1 my_agent --p2 random --n 1
+
+<span class="dim"># Train from the UI</span>
+python ui/server.py
+<span class="dim"># Open http://localhost:5000/train and select your model</span>
+
+<span class="dim"># Run the test suite</span>
+python tests/test.py</code></pre>
+
+    <h3>File checklist</h3>
+    <table class="field-table">
+        <tr><th>File</th><th>Action</th></tr>
+        <tr><td><code>ai/rl/my_agent.py</code></td><td>New &mdash; agent class with <code>choose_action()</code></td></tr>
+        <tr><td><code>ai/training/my_agent_training.py</code></td><td>New &mdash; training script with CLI args (optional)</td></tr>
+        <tr><td><code>ai/registry.py</code></td><td>Edit &mdash; add one dict entry to <code>AGENTS</code></td></tr>
+    </table>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skud Pai Sho</title>
+    <link rel="preload" as="image" href="/static/tiles/HR3.png"><link rel="preload" as="image" href="/static/tiles/HR4.png"><link rel="preload" as="image" href="/static/tiles/HR5.png">
+    <link rel="preload" as="image" href="/static/tiles/HW3.png"><link rel="preload" as="image" href="/static/tiles/HW4.png"><link rel="preload" as="image" href="/static/tiles/HW5.png">
+    <link rel="preload" as="image" href="/static/tiles/GR3.png"><link rel="preload" as="image" href="/static/tiles/GR4.png"><link rel="preload" as="image" href="/static/tiles/GR5.png">
+    <link rel="preload" as="image" href="/static/tiles/GW3.png"><link rel="preload" as="image" href="/static/tiles/GW4.png"><link rel="preload" as="image" href="/static/tiles/GW5.png">
+    <link rel="preload" as="image" href="/static/tiles/HR.png"><link rel="preload" as="image" href="/static/tiles/HW.png"><link rel="preload" as="image" href="/static/tiles/HK.png"><link rel="preload" as="image" href="/static/tiles/HB.png">
+    <link rel="preload" as="image" href="/static/tiles/GR.png"><link rel="preload" as="image" href="/static/tiles/GW.png"><link rel="preload" as="image" href="/static/tiles/GK.png"><link rel="preload" as="image" href="/static/tiles/GB.png">
+    <link rel="preload" as="image" href="/static/tiles/HO.png"><link rel="preload" as="image" href="/static/tiles/HL.png"><link rel="preload" as="image" href="/static/tiles/GO.png"><link rel="preload" as="image" href="/static/tiles/GL.png">
+    <style>
+        :root {
+          /* Lichess-inspired dark palette */
+          --bg:        #161512;
+          --bg-light:  #1d1b18;
+          --panel:     #262421;
+          --panel-hover: #302e2c;
+          --border:    #3a3835;
+          --text:      #bababa;
+          --text-dim:  #8b8987;
+          --text-bright: #e0e0e0;
+          --accent:    #629924;
+          --accent-hover: #7ab82e;
+          --link:      #81b64c;
+
+          /* Board colors */
+          --board-light: #d4a76a;
+          --board-dark:  #8b5e34;
+          --board-red:   #b8593e;
+          --board-wht:   #d4c4a0;
+          --board-mid:   #b8945c;
+          --gate-clr:    #b8593e;
+
+          --grid-line: rgba(40, 20, 5, 0.5);
+
+          /* Player colors */
+          --p1:       #4a90d9;
+          --p1-bg:    #1e3a5c;
+          --p2:       #d94a4a;
+          --p2-bg:    #5c1e1e;
+
+          --cell: 34px;
+          --radius: 4px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+          background: var(--bg);
+          color: var(--text);
+          font-family: 'Noto Sans', 'Segoe UI', Roboto, -apple-system, sans-serif;
+          font-size: 14px;
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          overflow-x: hidden;
+        }
+
+        /* ── Header ── */
+        header {
+          width: 100%;
+          height: 44px;
+          background: var(--panel);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 16px;
+          border-bottom: 1px solid var(--border);
+          flex-shrink: 0;
+        }
+        .logo {
+          font-size: 1.1rem;
+          font-weight: 700;
+          color: var(--text-bright);
+          letter-spacing: .02em;
+        }
+        .logo span { font-weight: 400; color: var(--text-dim); }
+        .header-actions { display: flex; gap: 6px; align-items: center; }
+
+        /* ── Buttons ── */
+        .btn {
+          background: var(--panel-hover);
+          border: none;
+          color: var(--text);
+          font-family: inherit;
+          font-size: .8rem;
+          font-weight: 600;
+          padding: 6px 14px;
+          border-radius: var(--radius);
+          cursor: pointer;
+          transition: background .15s, color .15s;
+          letter-spacing: .02em;
+        }
+        .btn:hover { background: #403e3b; color: var(--text-bright); }
+        .btn.active { background: var(--accent); color: #fff; }
+        .btn.active:hover { background: var(--accent-hover); }
+        .btn-accent { background: var(--accent); color: #fff; }
+        .btn-accent:hover { background: var(--accent-hover); }
+
+        /* ── Status bar ── */
+        #status-bar {
+          margin: 10px auto 6px;
+          max-width: 700px;
+          text-align: center;
+          font-size: .9rem;
+          color: var(--text-dim);
+          min-height: 24px;
+          padding: 0 16px;
+          transition: color .3s;
+        }
+        #status-bar.win { color: var(--accent); font-size: 1rem; font-weight: 700; }
+
+        /* ── Main layout ── */
+        main {
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          gap: 16px;
+          padding: 0 16px 32px;
+          width: 100%;
+          max-width: 1140px;
+        }
+
+        /* ── Player panels ── */
+        .player-panel {
+          width: 200px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+        .player-header {
+          font-size: .85rem;
+          font-weight: 700;
+          padding: 8px 12px;
+          border-radius: var(--radius);
+          text-align: center;
+          letter-spacing: .02em;
+        }
+        .player-header.p1 { background: var(--p1-bg); color: var(--p1); border-left: 3px solid var(--p1); }
+        .player-header.p2 { background: var(--p2-bg); color: var(--p2); border-left: 3px solid var(--p2); }
+        .player-header.active { box-shadow: inset 0 0 0 1px currentColor; }
+
+        .hand-label {
+          font-size: .7rem;
+          font-weight: 600;
+          letter-spacing: .08em;
+          color: var(--text-dim);
+          text-transform: uppercase;
+          padding: 2px 4px;
+        }
+
+        .hand-grid {
+          position: relative;
+          width: 190px;
+          height: 190px;
+          margin: 10px auto 20px;
+        }
+        .hand-grid::before {
+          content: '';
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 140px; height: 140px;
+          margin: -70px 0 0 -70px;
+          border: 1px dashed var(--border);
+          border-radius: 50%;
+          z-index: 0;
+          pointer-events: none;
+        }
+
+        .tile-btn {
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 52px; height: 52px;
+          margin-top: -26px; margin-left: -26px;
+          border-radius: 50%;
+          border: 2px solid transparent;
+          cursor: pointer;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          font-size: .7rem;
+          font-family: inherit;
+          transition: transform .12s, box-shadow .12s;
+          user-select: none;
+          z-index: 1;
+          transform: translate(var(--x, 0), var(--y, 0));
+          background: var(--panel-hover);
+          color: var(--text);
+        }
+        .tile-btn .tile-icon { font-size: 1.3rem; line-height: 1; }
+        .tile-btn .tile-name { font-size: .5rem; letter-spacing: .03em; margin-top: 1px; }
+        .tile-btn .tile-count {
+          position: absolute; top: -2px; right: -4px;
+          font-size: .6rem; font-weight: 700;
+          color: var(--text-bright);
+          text-shadow: 0 1px 2px rgba(0,0,0,.8);
+        }
+
+        .hand-grid .tile-btn.flower-red {
+          background: #5c2020 !important;
+          color: #e8a0a0 !important;
+          border-color: #7a3030 !important;
+        }
+
+        .tile-btn:hover:not(:disabled) { transform: translate(var(--x, 0), var(--y, 0)) scale(1.08); }
+        .tile-btn.selected {
+          border-color: var(--accent) !important;
+          box-shadow: 0 0 8px rgba(98,153,36,.5);
+          transform: translate(var(--x, 0), var(--y, 0)) scale(1.12);
+        }
+        .tile-btn:disabled { opacity: .25; cursor: default; }
+        .tile-btn.empty { opacity: .4; cursor: default; }
+
+        .harmony-count {
+          font-size: .8rem;
+          font-weight: 600;
+          text-align: center;
+          padding: 6px;
+          border-radius: var(--radius);
+          background: var(--panel);
+          border: 1px solid var(--border);
+          color: var(--text);
+        }
+
+        /* ── Board ── */
+        #board-wrap {
+          position: relative;
+          width: calc(18 * var(--cell));
+          height: calc(18 * var(--cell));
+          margin: calc(var(--cell) / 2);
+          transition: width 0.15s ease, height 0.15s ease, margin 0.15s ease;
+        }
+        #board-visuals {
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background-color: var(--board-mid);
+          box-shadow: 0 0 0 3px #4a3a28, 0 0 30px rgba(0,0,0,0.6);
+          overflow: hidden;
+        }
+        .board-diamond {
+          position: absolute;
+          width: calc(14 * var(--cell));
+          height: calc(14 * var(--cell));
+          left: calc(2 * var(--cell));
+          top: calc(2 * var(--cell));
+          background: conic-gradient(
+            var(--board-red) 0deg 90deg,
+            var(--board-wht) 90deg 180deg,
+            var(--board-red) 180deg 270deg,
+            var(--board-wht) 270deg 360deg
+          );
+          clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+        }
+        .board-gate { position: absolute; background: var(--gate-clr); }
+        .gate-n {
+          top: 0; left: calc(7 * var(--cell));
+          width: calc(4 * var(--cell)); height: calc(2 * var(--cell));
+          clip-path: polygon(0 0, 100% 0, 50% 100%);
+        }
+        .gate-s {
+          bottom: 0; left: calc(7 * var(--cell));
+          width: calc(4 * var(--cell)); height: calc(2 * var(--cell));
+          clip-path: polygon(50% 0, 100% 100%, 0 100%);
+        }
+        .gate-w {
+          left: 0; top: calc(7 * var(--cell));
+          width: calc(2 * var(--cell)); height: calc(4 * var(--cell));
+          clip-path: polygon(0 0, 100% 50%, 0 100%);
+        }
+        .gate-e {
+          right: 0; top: calc(7 * var(--cell));
+          width: calc(2 * var(--cell)); height: calc(4 * var(--cell));
+          clip-path: polygon(100% 0, 100% 100%, 0 50%);
+        }
+        #board-visuals::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background-image:
+            linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+            linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+          background-size: var(--cell) var(--cell);
+          background-position: -1px -1px;
+          z-index: 1;
+        }
+
+        #board-intersections {
+          position: absolute;
+          top: calc(-0.5 * var(--cell));
+          left: calc(-0.5 * var(--cell));
+          width: calc(19 * var(--cell));
+          height: calc(19 * var(--cell));
+          display: grid;
+          grid-template-columns: repeat(19, var(--cell));
+          grid-template-rows: repeat(19, var(--cell));
+          z-index: 2;
+        }
+        .cell {
+          width: var(--cell); height: var(--cell);
+          display: flex; align-items: center; justify-content: center;
+          position: relative;
+        }
+        .cell.void { pointer-events: none; }
+        .cell.valid-move { cursor: pointer; }
+        .cell.valid-move::after {
+          content: '';
+          position: absolute;
+          inset: 3px;
+          border-radius: 50%;
+          background: rgba(98, 153, 36, 0.25);
+          border: 2px solid rgba(98, 153, 36, 0.6);
+          pointer-events: none;
+        }
+
+        .board-tile {
+          width: 26px; height: 26px;
+          border-radius: 50%;
+          display: flex; align-items: center; justify-content: center; flex-direction: column;
+          cursor: pointer;
+          position: relative;
+          z-index: 3;
+          transition: transform .12s, box-shadow .12s;
+          user-select: none;
+        }
+        .board-tile .tile-icon { font-size: 1rem; line-height: 1; }
+        .board-tile.p1-tile {
+          background: radial-gradient(circle at 35% 35%, #4a80cc, #1a3a7a);
+          border: 2px solid #4a80cc;
+          color: #b0d0ff;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .board-tile.p2-tile {
+          background: radial-gradient(circle at 35% 35%, #cc4a4a, #7a1a1a);
+          border: 2px solid #cc4a4a;
+          color: #ffb0b0;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        .board-tile.growing { opacity: .75; border-style: dashed; }
+        .board-tile.selected-tile {
+          border-color: var(--accent);
+          box-shadow: 0 0 10px rgba(98,153,36,.6);
+          transform: scale(1.15);
+        }
+        .board-tile:hover { transform: scale(1.1); }
+        .board-tile.growing-tile::after {
+          content: '⬆';
+          position: absolute; top: -5px; right: -5px;
+          font-size: .6rem;
+          color: var(--accent);
+          text-shadow: 0 0 3px rgba(0,0,0,.8);
+        }
+
+        /* ── Harmony lines ── */
+        #harmony-svg {
+          position: absolute;
+          top: calc(-0.5 * var(--cell)); left: calc(-0.5 * var(--cell));
+          width: calc(19 * var(--cell)); height: calc(19 * var(--cell));
+          pointer-events: none; z-index: 4;
+        }
+        .harmony-line-p1,
+        .harmony-line-p2 {
+          stroke-width: 2.5;
+          stroke-dasharray: 6 5;
+          stroke-linecap: round;
+          opacity: .78;
+          animation: harmony-flow 4s linear infinite;
+        }
+        .harmony-line-p1 { stroke: #5a9ad9; }
+        .harmony-line-p2 { stroke: #d95a5a; }
+        @keyframes harmony-flow {
+          to { stroke-dashoffset: -22; }
+        }
+        .harmony-line-p1.win-ring,
+        .harmony-line-p2.win-ring {
+          stroke-dasharray: none;
+          stroke-linecap: round;
+        }
+        .harmony-line-p1.win-ring { animation: harmony-bloom-p1 3.6s cubic-bezier(.4,0,.6,1) infinite; }
+        .harmony-line-p2.win-ring { animation: harmony-bloom-p2 3.6s cubic-bezier(.4,0,.6,1) infinite; }
+        @keyframes harmony-bloom-p1 {
+          0%, 100% {
+            stroke: #7ab3e3; stroke-width: 3.2; opacity: .92;
+            filter:
+              drop-shadow(0 0 2px rgba(255,245,220,.75))
+              drop-shadow(0 0 6px rgba(90,154,217,.7))
+              drop-shadow(0 0 14px rgba(232,195,120,.45));
+          }
+          50% {
+            stroke: #c4e1f5; stroke-width: 5; opacity: 1;
+            filter:
+              drop-shadow(0 0 3px rgba(255,248,228,1))
+              drop-shadow(0 0 11px rgba(140,195,235,.9))
+              drop-shadow(0 0 26px rgba(232,195,120,.85));
+          }
+        }
+        @keyframes harmony-bloom-p2 {
+          0%, 100% {
+            stroke: #e37a7a; stroke-width: 3.2; opacity: .92;
+            filter:
+              drop-shadow(0 0 2px rgba(255,245,220,.75))
+              drop-shadow(0 0 6px rgba(217,90,90,.7))
+              drop-shadow(0 0 14px rgba(232,195,120,.45));
+          }
+          50% {
+            stroke: #f5c4c4; stroke-width: 5; opacity: 1;
+            filter:
+              drop-shadow(0 0 3px rgba(255,248,228,1))
+              drop-shadow(0 0 11px rgba(235,140,140,.9))
+              drop-shadow(0 0 26px rgba(232,195,120,.85));
+          }
+        }
+
+        /* ── Win overlay ── */
+        #win-overlay {
+          display: none;
+          position: fixed; inset: 0;
+          background: rgba(0,0,0,.7);
+          z-index: 100;
+          align-items: center; justify-content: center;
+        }
+        #win-overlay.show { display: flex; }
+        .win-card {
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          padding: 32px 48px;
+          text-align: center;
+          max-width: 380px;
+          animation: pop-in .3s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes pop-in { from { transform: scale(.8); opacity:0; } to { transform: scale(1); opacity:1; } }
+        .win-title { font-size: 1.4rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+        .win-sub { color: var(--text-dim); font-size: .9rem; margin-bottom: 20px; }
+
+        /* ── Side panel extras ── */
+        .tile-img {
+          width: 100%; height: 100%;
+          object-fit: cover;
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .accent-tiles, .special-tiles {
+          display: flex; gap: 6px; justify-content: center; margin-top: 6px;
+        }
+        .accent-tiles .tile-btn, .special-tiles .tile-btn {
+          position: relative; top: auto; left: auto; margin: 0;
+          width: 34px; height: 34px; margin-top: 0; margin-left: 0;
+          --x: 0px; --y: 0px;
+        }
+
+        .ref-section {
+          font-size: .75rem;
+          color: var(--text-dim);
+          line-height: 1.5;
+          background: var(--panel);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 8px 10px;
+        }
+        .ref-section strong { color: var(--text); font-size: .8rem; }
+
+        .instructions {
+          font-size: .75rem;
+          line-height: 1.6;
+          color: var(--text-dim);
+          border-top: 1px solid var(--border);
+          padding-top: 8px;
+        }
+        .instructions em { color: var(--accent); font-style: normal; font-weight: 600; }
+
+        /* ── Player type selector ── */
+        .player-type-row {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          margin-bottom: 4px;
+        }
+        .player-type-row select {
+          flex: 1;
+          background: var(--bg-light);
+          color: var(--text);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 4px 6px;
+          font-family: inherit;
+          font-size: .78rem;
+          cursor: pointer;
+        }
+        .player-type-row select:focus { outline: 1px solid var(--accent); }
+
+        .btn-adv {
+          background: none;
+          border: 1px solid var(--border);
+          color: var(--text-dim);
+          font-family: inherit;
+          font-size: .65rem;
+          padding: 3px 7px;
+          border-radius: var(--radius);
+          cursor: pointer;
+          white-space: nowrap;
+          transition: color .15s, border-color .15s;
+        }
+        .btn-adv:hover { color: var(--text-bright); border-color: var(--text-dim); }
+        .btn-adv.open { color: var(--accent); border-color: var(--accent); }
+
+        .adv-panel {
+          display: none;
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 6px 8px;
+          margin-bottom: 4px;
+          font-size: .75rem;
+        }
+        .adv-panel.show { display: block; }
+        .adv-panel label {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 6px;
+          margin-bottom: 3px;
+          color: var(--text-dim);
+        }
+        .adv-panel input[type="number"],
+        .adv-panel input[type="text"] {
+          background: var(--panel);
+          color: var(--text);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 2px 4px;
+          font-family: inherit;
+          font-size: .75rem;
+        }
+        .adv-panel input[type="number"] { width: 60px; text-align: right; }
+        .adv-panel input[type="text"]   { width: 80px; }
+        .adv-panel input:focus { outline: 1px solid var(--accent); }
+        .adv-panel .param-label { display: inline-flex; align-items: center; gap: 4px; }
+        .adv-panel .info {
+          display: inline-block;
+          width: 13px;
+          height: 13px;
+          border-radius: 50%;
+          background: var(--panel-hover);
+          color: var(--text-dim);
+          font-size: 10px;
+          line-height: 13px;
+          text-align: center;
+          cursor: help;
+          font-style: normal;
+          font-weight: 600;
+        }
+        .adv-panel .info:hover { background: var(--accent); color: #fff; }
+
+        @media (max-width: 600px) {
+          .player-panel { display: none; }
+          main { padding: 0 8px 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div class="logo">Skud <span>Pai Sho</span></div>
+        <a href="/train" class="btn" style="text-decoration:none;">Train</a>
+        <a href="/simulate" class="btn" style="text-decoration:none;">Simulate</a>
+        <a href="/leaderboard" class="btn" style="text-decoration:none;">Leaderboard</a>
+        <a href="/rules" class="btn" style="text-decoration:none;">Rules</a>
+        <a href="/guide" class="btn" style="text-decoration:none;">Guide</a>
+    </div>
+    <div class="header-actions">
+        <label style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Whether game results count toward ELO ratings">
+            <input type="checkbox" id="rated-toggle" checked> Rated
+        </label>
+        <button class="btn btn-accent" id="start-btn" onclick="startGame()">Start Game</button>
+        <button class="btn" id="pause-btn" style="display:none" onclick="togglePause()">Pause</button>
+        <button class="btn" id="undo-btn" onclick="stepBack()" disabled title="Step Back">◀</button>
+        <button class="btn" id="redo-btn" onclick="stepForward()" disabled title="Step Forward">▶</button>
+        <button class="btn" onclick="saveGame()">Save</button>
+        <button class="btn" onclick="document.getElementById('load-input').click()">Load</button>
+        <input type="file" id="load-input" accept=".json" style="display:none" onchange="loadGame(event)">
+        <button class="btn btn-accent" onclick="newGame()">New Game</button>
+    </div>
+</header>
+
+<div id="status-bar">Loading…</div>
+
+<main id="main-layout">
+    <div class="player-panel" id="p1-panel">
+        <div class="player-header p1" id="p1-header">PLAYER 1</div>
+        <div id="p1-elo" style="font-size:12px;opacity:0.8;margin:2px 0;">ELO: —</div>
+        <div class="player-type-row">
+            <select id="p1-type" onchange="onPlayerTypeChange(1)">
+                <option value="human">Human</option>
+            </select>
+            <button class="btn-adv" id="p1-adv-btn" style="display:none" onclick="toggleAdvanced(1)">Advanced</button>
+        </div>
+        <div class="adv-panel" id="p1-adv-panel"></div>
+        <div class="hand-label">Hand</div>
+        <div class="hand-grid p1" id="p1-hand"></div>
+        <div id="p1-extra-tiles"></div>
+        <div class="harmony-count" id="p1-harmonies">Harmonies: 0</div>
+
+        <div class="instructions">
+            <em>Plant</em> at a Gate, then <em>Arrange</em> your tiles.<br>
+            Pair circle-neighbours to form a <em>Harmony</em>.<br>
+            <em>Win</em>: ring the center with your harmonies.
+            <div style="margin-top:6px;"><a href="/rules" style="color:var(--link);text-decoration:none;">Full rules →</a></div>
+        </div>
+    </div>
+
+    <div id="board-wrap">
+        <div id="board-visuals">
+            <div class="board-diamond"></div>
+            <div class="board-gate gate-n"></div>
+            <div class="board-gate gate-s"></div>
+            <div class="board-gate gate-e"></div>
+            <div class="board-gate gate-w"></div>
+        </div>
+        <div id="board-intersections"></div>
+        <svg id="harmony-svg"></svg>
+    </div>
+
+    <div class="player-panel" id="p2-panel">
+        <div class="player-header p2" id="p2-header">PLAYER 2</div>
+        <div id="p2-elo" style="font-size:12px;opacity:0.8;margin:2px 0;">ELO: —</div>
+        <div class="player-type-row">
+            <select id="p2-type" onchange="onPlayerTypeChange(2)">
+                <option value="human">Human</option>
+            </select>
+            <button class="btn-adv" id="p2-adv-btn" style="display:none" onclick="toggleAdvanced(2)">Advanced</button>
+        </div>
+        <div class="adv-panel" id="p2-adv-panel"></div>
+        <div class="hand-label">Hand</div>
+        <div class="hand-grid p2" id="p2-hand"></div>
+        <div id="p2-extra-tiles"></div>
+        <div class="harmony-count" id="p2-harmonies">Harmonies: 0</div>
+        <div style="margin-top:8px;">
+            <div class="ref-section" style="border-radius:var(--radius) var(--radius) 0 0; padding-bottom:4px;">
+                <strong>Match History</strong>
+            </div>
+            <div class="ref-section" id="move-history" style="max-height:170px; overflow-y:auto; border-radius:0 0 var(--radius) var(--radius); border-top:none; margin-top:0;">
+            </div>
+        </div>
+    </div>
+</main>
+
+<div id="win-overlay">
+    <div class="win-card">
+        <div class="win-title" id="win-title">Player 1 Wins!</div>
+        <div class="win-sub" id="win-sub">A Harmony Ring blooms around the center.</div>
+        <div id="win-elo" style="margin:10px 0;font-size:13px;opacity:0.9;"></div>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button class="btn" onclick="document.getElementById('win-overlay').classList.remove('show')">Close</button>
+            <button class="btn btn-accent" onclick="newGame()">Play Again</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BOARD_SIZE = 19;
+    const API  = '/api';
+    const GID  = 'default';
+
+    const CELL_MAX = 34;
+    const CELL_MIN = 18;
+    let CELL = CELL_MAX;
+
+    function updateCellSize() {
+        const main = document.getElementById('main-layout');
+        if (!main) return;
+
+        let occupied = 0;
+        document.querySelectorAll('.player-panel').forEach(p => {
+            if (getComputedStyle(p).display !== 'none') {
+                occupied += p.offsetWidth;
+            }
+        });
+
+        const visiblePanels = [...document.querySelectorAll('.player-panel')]
+            .filter(p => getComputedStyle(p).display !== 'none').length;
+        const gapPx = 16;
+        occupied += visiblePanels * gapPx;
+
+        const mainPadding = 32;
+        const availableForBoard = main.offsetWidth - occupied - mainPadding;
+        const ideal = Math.floor(availableForBoard / 19);
+        const newCell = Math.max(CELL_MIN, Math.min(CELL_MAX, ideal));
+
+        if (newCell !== CELL) {
+            CELL = newCell;
+            document.documentElement.style.setProperty('--cell', CELL + 'px');
+            if (state) renderHarmonies();
+        }
+    }
+
+    const _ro = new ResizeObserver(updateCellSize);
+    _ro.observe(document.getElementById('main-layout'));
+
+    const FLOWER_META = {
+      Rose:          { p1_img: 'HR3.png', p2_img: 'GR3.png', abbr: 'Ro', color: 'red' },
+      Chrysanthemum: { p1_img: 'HR4.png', p2_img: 'GR4.png', abbr: 'Ch', color: 'red' },
+      Rhododendron:  { p1_img: 'HR5.png', p2_img: 'GR5.png', abbr: 'Rh', color: 'red' },
+      Jasmine:       { p1_img: 'HW3.png', p2_img: 'GW3.png', abbr: 'Js', color: 'white' },
+      Lily:          { p1_img: 'HW4.png', p2_img: 'GW4.png', abbr: 'Lo', color: 'white' },
+      Jade:          { p1_img: 'HW5.png', p2_img: 'GW5.png', abbr: 'Jd', color: 'white' },
+    };
+
+    const CIRCLE = ['Rose', 'Chrysanthemum', 'Rhododendron', 'Jasmine', 'Lily', 'Jade'];
+
+    const ACCENT_META = {
+      Rock:     { p1_img: 'HR.png',  p2_img: 'GR.png',  label: 'Rock' },
+      Wheel:    { p1_img: 'HW.png',  p2_img: 'GW.png',  label: 'Wheel' },
+      Knotweed: { p1_img: 'HK.png',  p2_img: 'GK.png',  label: 'Knotweed' },
+      Boat:     { p1_img: 'HB.png',  p2_img: 'GB.png',  label: 'Boat' },
+    };
+    const SPECIAL_META = {
+      Orchid:    { p1_img: 'HO.png', p2_img: 'GO.png', label: 'Orchid' },
+      WhiteLotus:{ p1_img: 'HL.png', p2_img: 'GL.png', label: 'White Lotus' },
+    };
+
+    // Long descriptions for hand-tile hover (rich). Board tiles use a shorter summary.
+    const TILE_DESC = {
+      Rose:          'Rose — red flower, moves up to 3 spaces. Harmonises with its circle neighbours (Jade, Chrysanthemum).',
+      Chrysanthemum: 'Chrysanthemum — red flower, moves up to 4 spaces. Harmonises with Rose and Rhododendron.',
+      Rhododendron:  'Rhododendron — red flower, moves up to 5 spaces. Harmonises with Chrysanthemum and Jasmine.',
+      Jasmine:       'Jasmine — white flower, moves up to 3 spaces. Harmonises with Rhododendron and Lily.',
+      Lily:          'Lily — white flower, moves up to 4 spaces. Harmonises with Jasmine and Jade.',
+      Jade:          'Jade — white flower, moves up to 5 spaces. Harmonises with Lily and Rose.',
+      Rock:          'Rock (accent, bonus turn) — blocks a space so no flower can enter it.',
+      Wheel:         'Wheel (accent, bonus turn) — rotates the four surrounding flowers one step.',
+      Knotweed:      'Knotweed (accent, bonus turn) — disables harmonies for nearby flowers.',
+      Boat:          'Boat (accent, bonus turn) — picks up a flower and drops it on any legal space.',
+      Orchid:        'Orchid (special) — long-reach flower, up to 6 spaces.',
+      WhiteLotus:    'White Lotus (special) — short-reach flower, up to 2 spaces.',
+    };
+
+    function getTileMeta(flower) {
+      return FLOWER_META[flower] || ACCENT_META[flower] || SPECIAL_META[flower] || null;
+    }
+
+    let state        = null;
+    let selection    = null;
+    let validMoves   = [];
+    let validMovesSet = new Set();
+    let agentNames   = {'1': 'Player 1', '2': 'Player 2'};
+
+    let cachedStatic = null;
+    let prevBoard    = null;
+    let prevSelection = null;
+    let prevValidMovesSet = new Set();
+
+    function buildMovesSet(moves) {
+      const s = new Set();
+      for (const [r, c] of moves) s.add(`${r},${c}`);
+      return s;
+    }
+
+    function cacheStaticData(st) {
+      if (cachedStatic) return;
+      const vsSet = new Set();
+      for (const [r, c] of st.valid_spaces) vsSet.add(`${r},${c}`);
+      cachedStatic = {
+        valid_spaces: st.valid_spaces,
+        validSpacesSet: vsSet,
+        gates: st.gates,
+        flower_data: st.flower_data,
+        harmony_circle: st.harmony_circle,
+      };
+    }
+
+    async function post(url, body={}) {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      return r.json();
+    }
+
+    function applyAgentNames(data) {
+      const h1 = document.getElementById('p1-header');
+      const h2 = document.getElementById('p2-header');
+      const name1 = data['1'], name2 = data['2'];
+      h1.textContent = name1 ? `P1: ${name1}` : 'PLAYER 1';
+      h2.textContent = name2 ? `P2: ${name2}` : 'PLAYER 2';
+    }
+
+    setInterval(async () => {
+      try {
+        const r = await fetch(`${API}/agents`);
+        const data = await r.json();
+        if (data['1'] !== agentNames['1'] || data['2'] !== agentNames['2']) {
+          agentNames = data;
+          applyAgentNames(agentNames);
+        }
+      } catch (e) {}
+    }, 2000);
+
+    async function newGame() {
+      if (gameRunning) {
+        gameAborted = true;
+        // Give the loop a moment to stop
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      const r = await post(`${API}/new_game`);
+      state = r.state;
+      cacheStaticData(state);
+      selection = null;
+      validMoves = [];
+      validMovesSet = new Set();
+      prevBoard = null;
+      prevSelection = null;
+      prevValidMovesSet = new Set();
+      handBuilt = false;
+      canUndo = false; canRedo = false; futureHistory = []; updateUndoRedoButtons();
+      renderAll();
+      document.getElementById('win-overlay').classList.remove('show');
+    }
+
+    async function fetchValidMoves(row, col) {
+      const r = await post(`${API}/valid_moves/${GID}`, {row, col});
+      return r.moves || [];
+    }
+
+    function initBoard() {
+      const grid = document.getElementById('board-intersections');
+      grid.innerHTML = '';
+
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const cell = document.createElement('div');
+          cell.id = `cell-${r}-${c}`;
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+          cell.className = 'cell';
+          cell.addEventListener('click', () => onCellClick(r, c));
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function renderAll() {
+      if (!state) return;
+      renderBoard();
+      renderHands();
+      renderHarmonies();
+      renderStatus();
+      renderHistory();
+    }
+
+    function renderBoard() {
+      if (!cachedStatic) return;
+      const boardData = state.board;
+      const vsSet = cachedStatic.validSpacesSet;
+
+      const selKey = selection?.type === 'board' ? `${selection.row},${selection.col}` : null;
+      const prevSelKey = prevSelection?.type === 'board' ? `${prevSelection.row},${prevSelection.col}` : null;
+
+      for (let r = 0; r < BOARD_SIZE; r++) {
+        for (let c = 0; c < BOARD_SIZE; c++) {
+          const key = `${r},${c}`;
+          const cell = document.getElementById(`cell-${r}-${c}`);
+          if (!cell) continue;
+
+          if (!vsSet.has(key)) {
+            if (!cell.classList.contains('void')) cell.className = 'cell void';
+            continue;
+          }
+
+          const tile = boardData[key] || null;
+          const prevTile = prevBoard ? (prevBoard[key] || null) : undefined;
+          const isMove = validMovesSet.has(key);
+          const wasMove = prevValidMovesSet.has(key);
+          const isSel = key === selKey;
+          const wasSel = key === prevSelKey;
+
+          const tileChanged = prevBoard === undefined || prevBoard === null
+            || (tile === null) !== (prevTile === null)
+            || (tile && prevTile && (tile.flower !== prevTile.flower || tile.player !== prevTile.player || tile.growing !== prevTile.growing));
+
+          if (!tileChanged && isMove === wasMove && isSel === wasSel) continue;
+
+          cell.className = 'cell' + (isMove ? ' valid-move' : '');
+          cell.innerHTML = '';
+
+          if (tile) {
+            const meta = getTileMeta(tile.flower);
+            const div = document.createElement('div');
+            div.className = `board-tile ${tile.player===1?'p1-tile':'p2-tile'}${tile.growing?' growing':''}`;
+
+            if (isSel) div.classList.add('selected-tile');
+
+            if (meta) {
+              const imgSrc = tile.player === 1 ? meta.p1_img : meta.p2_img;
+              div.innerHTML = `<img src="/static/tiles/${imgSrc}" class="tile-img" alt="${tile.flower}">`;
+            } else {
+              div.innerHTML = `<span style="font-size:.55rem">${tile.flower.slice(0,2)}</span>`;
+            }
+            const fd = cachedStatic?.flower_data?.[tile.flower];
+            const moveStr = fd?.move != null ? ` · moves ${fd.move}` : '';
+            div.title = `P${tile.player} ${tile.flower}${moveStr}${tile.growing ? ' (growing)' : ''}`;
+            if (tile.growing) div.classList.add('growing-tile');
+
+            div.addEventListener('click', e => { e.stopPropagation(); onTileClick(r, c); });
+            cell.appendChild(div);
+          }
+        }
+      }
+
+      prevBoard = Object.assign({}, boardData);
+      prevSelection = selection ? Object.assign({}, selection) : null;
+      prevValidMovesSet = new Set(validMovesSet);
+    }
+
+    function renderHarmonies() {
+      const svg = document.getElementById('harmony-svg');
+      svg.innerHTML = '';
+
+      const svgSize = 19 * CELL;
+      svg.setAttribute('viewBox', `0 0 ${svgSize} ${svgSize}`);
+
+      if (!state.harmonies) return;
+
+      for (const [pkey, cls] of [['1','harmony-line-p1'],['2','harmony-line-p2']]) {
+        const isWinner = state.winner && String(state.winner) === pkey;
+        for (const [[r1,c1],[r2,c2]] of (state.harmonies[pkey]||[])) {
+          const x1 = c1 * CELL + CELL / 2, y1 = r1 * CELL + CELL / 2;
+          const x2 = c2 * CELL + CELL / 2, y2 = r2 * CELL + CELL / 2;
+
+          const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+          line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+          line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+          line.setAttribute('class', isWinner ? `${cls} win-ring` : cls);
+          svg.appendChild(line);
+        }
+      }
+
+      const p1count = (state.harmonies['1']||[]).length;
+      const p2count = (state.harmonies['2']||[]).length;
+      document.getElementById('p1-harmonies').textContent = `Harmonies: ${p1count}`;
+      document.getElementById('p2-harmonies').textContent = `Harmonies: ${p2count}`;
+    }
+
+    let handBuilt = false;
+    const handRefs = {};
+
+    function buildHands() {
+      if (handBuilt) return;
+      const ANGLES = [300, 0, 60, 120, 180, 240];
+      const RAD = 70;
+
+      for (const p of [1, 2]) {
+        const container = document.getElementById(`p${p}-hand`);
+        container.innerHTML = '';
+        let index = 0;
+        for (const flower of CIRCLE) {
+          const meta = FLOWER_META[flower];
+          const btn = document.createElement('button');
+          btn.className = `tile-btn flower-${meta.color}`;
+          const angleRad = ANGLES[index] * (Math.PI / 180);
+          btn.style.setProperty('--x', `${RAD * Math.cos(angleRad)}px`);
+          btn.style.setProperty('--y', `${RAD * Math.sin(angleRad)}px`);
+          const imgSrc = p === 1 ? meta.p1_img : meta.p2_img;
+          const flowerData = cachedStatic?.flower_data?.[flower];
+          const moveSpaces = flowerData?.move || '?';
+          btn.title = TILE_DESC[flower] || `${flower} (moves ${moveSpaces} spaces)`;
+          btn.innerHTML = `<img src="/static/tiles/${imgSrc}" class="tile-img" alt="${flower}"><span class="tile-count"></span>`;
+          btn.addEventListener('click', () => onHandClick(p, flower));
+          container.appendChild(btn);
+          handRefs[`${p}_${flower}`] = { btn, countSpan: btn.querySelector('.tile-count') };
+          index++;
+        }
+
+        const extraContainer = document.getElementById(`p${p}-extra-tiles`);
+        extraContainer.innerHTML = '';
+        for (const [rowClass, metaObj] of [['accent-tiles', ACCENT_META], ['special-tiles', SPECIAL_META]]) {
+          const row = document.createElement('div');
+          row.className = rowClass;
+          for (const [tname, meta] of Object.entries(metaObj)) {
+            const btn = document.createElement('button');
+            btn.className = 'tile-btn';
+            const imgSrc = p === 1 ? meta.p1_img : meta.p2_img;
+            btn.innerHTML = `<img src="/static/tiles/${imgSrc}" class="tile-img" alt="${tname}"><span class="tile-count"></span>`;
+            btn.title = TILE_DESC[tname] || `${meta.label} (bonus turn only)`;
+            btn.addEventListener('click', () => onHandClick(p, tname));
+            row.appendChild(btn);
+            handRefs[`${p}_${tname}`] = { btn, countSpan: btn.querySelector('.tile-count') };
+          }
+          extraContainer.appendChild(row);
+        }
+      }
+      handBuilt = true;
+    }
+
+    function renderHands() {
+      buildHands();
+      const cur = state.current_player;
+      document.getElementById('p1-header').classList.toggle('active', cur===1 && !state.winner);
+      document.getElementById('p2-header').classList.toggle('active', cur===2 && !state.winner);
+
+      for (const p of [1, 2]) {
+        const hand = state.hands[String(p)];
+        const isMe = (p === cur) && !state.winner;
+
+        for (const flower of CIRCLE) {
+          const ref = handRefs[`${p}_${flower}`];
+          const count = hand[flower] || 0;
+          ref.countSpan.textContent = `×${count}`;
+          ref.btn.disabled = !isMe || count === 0;
+          ref.btn.classList.toggle('empty', count === 0);
+          const isSel = selection?.type==='hand' && selection.flower===flower && selection.player===p;
+          ref.btn.classList.toggle('selected', isSel);
+        }
+
+        for (const metaObj of [ACCENT_META, SPECIAL_META]) {
+          for (const tname of Object.keys(metaObj)) {
+            const ref = handRefs[`${p}_${tname}`];
+            const count = hand[tname] || 0;
+            const canUse = isMe && state.bonus_turn && count > 0;
+            ref.countSpan.textContent = `×${count}`;
+            ref.btn.disabled = !canUse;
+            ref.btn.classList.toggle('empty', count === 0);
+            const isSel = selection?.type==='hand' && selection.flower===tname && selection.player===p;
+            ref.btn.classList.toggle('selected', isSel);
+          }
+        }
+      }
+    }
+
+    function renderStatus() {
+      const bar = document.getElementById('status-bar');
+      if (selection?.type === 'boat_target') {
+        bar.textContent = 'Choose where to displace the captured tile.';
+        bar.className = '';
+      } else {
+        bar.textContent = state.message;
+        bar.className   = (state.winner !== null && state.winner !== undefined) ? 'win' : '';
+      }
+
+      if (state.winner !== null && state.winner !== undefined) {
+        const title = state.winner === 0 ? 'Tie!' : `Player ${state.winner} Wins!`;
+        document.getElementById('win-title').textContent = title;
+        document.getElementById('win-sub').textContent = state.message || '';
+        document.getElementById('win-overlay').classList.add('show');
+        renderEloDelta();
+      }
+    }
+
+    function fmtDelta(d) {
+      if (d === undefined || d === null) return '';
+      const sign = d > 0 ? '+' : '';
+      return `${sign}${d.toFixed ? d.toFixed(1) : d}`;
+    }
+
+    async function refreshEloDisplay() {
+      try {
+        const rr = await fetch(`${API}/elo/leaderboard`);
+        const lb = await rr.json();
+        const ratings = {};
+        (lb.rows || []).forEach(r => { ratings[r.key] = r.rating; });
+        const resolve = (slot) => {
+          const k = document.getElementById(`p${slot}-type`).value;
+          if (!k) return null;
+          if (k === 'human') {
+            const nm = getHumanName(slot);
+            if (!nm) return null;
+            return ratings[`human:${nm}`];
+          }
+          return ratings[k];
+        };
+        const p1 = resolve(1);
+        const p2 = resolve(2);
+        document.getElementById('p1-elo').textContent = 'ELO: ' + (p1 != null ? p1 : '—');
+        document.getElementById('p2-elo').textContent = 'ELO: ' + (p2 != null ? p2 : '—');
+      } catch (e) {}
+    }
+
+    async function syncEloSession() {
+      try {
+        await post(`${API}/elo/session`, {
+          p1_key: document.getElementById('p1-type').value,
+          p2_key: document.getElementById('p2-type').value,
+          p1_human_name: getHumanName(1),
+          p2_human_name: getHumanName(2),
+          rated: document.getElementById('rated-toggle').checked,
+        });
+      } catch (e) {}
+    }
+
+    async function renderEloDelta() {
+      try {
+        const r = await fetch(`${API}/state/${GID}`);
+        const d = await r.json();
+        const box = document.getElementById('win-elo');
+        if (!box) return;
+        if (d.elo_result) {
+          const er = d.elo_result;
+          box.innerHTML = `
+            <div>P1 ${er.p1_before} → ${er.p1_after} (${fmtDelta(er.p1_delta)})</div>
+            <div>P2 ${er.p2_before} → ${er.p2_after} (${fmtDelta(er.p2_delta)})</div>`;
+        } else {
+          box.textContent = 'Unrated game — ELO unchanged.';
+        }
+        refreshEloDisplay();
+      } catch (e) {}
+    }
+
+    function formatMove(move) {
+      if (move[0] === 'plant') return `Plant ${move[1]} at (${move[2]},${move[3]})`;
+      if (move[0] === 'arrange') return `Move (${move[1]},${move[2]}) → (${move[3]},${move[4]})`;
+      return move.join(' ');
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('move-history');
+      if (!container) return;
+      const history = state.history || [];
+      const allMoves = history.concat(futureHistory);
+      if (allMoves.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-dim);font-style:italic">No moves yet</span>';
+        return;
+      }
+      let html = '';
+      for (let i = 0; i < allMoves.length; i++) {
+        const move = allMoves[i];
+        const num = i + 1;
+        const player = (i % 2 === 0) ? 1 : 2;
+        const isFuture = i >= history.length;
+        const pColor = isFuture ? 'var(--text-dim)' : (player === 1 ? 'var(--p1)' : 'var(--p2)');
+        const opacity = isFuture ? 'opacity:0.4;' : '';
+        const desc = formatMove(move);
+        html += `<div style="color:${pColor};padding:1px 0;${opacity}">${num}. ${desc}</div>`;
+      }
+      container.innerHTML = html;
+    }
+
+    async function onHandClick(player, flower) {
+      if (player !== state.current_player || state.winner) return;
+      const isAccentOrSpecial = (flower in ACCENT_META) || (flower in SPECIAL_META);
+      if (isAccentOrSpecial && !state.bonus_turn) return;
+
+      if (selection?.type==='hand' && selection.flower===flower && selection.player===player) {
+        selection = null;
+        validMoves = [];
+        validMovesSet = new Set();
+      } else {
+        selection = { type:'hand', flower, player };
+        if (isAccentOrSpecial) {
+          const r = await post(`${API}/valid_plant_moves/${GID}`, { tile: flower });
+          validMoves = r.moves || [];
+        } else {
+          const gates = cachedStatic ? cachedStatic.gates : state.gates;
+          validMoves = gates.filter(([r,c]) => !state.board[`${r},${c}`]);
+        }
+        validMovesSet = buildMovesSet(validMoves);
+      }
+      renderAll();
+    }
+
+    async function onTileClick(r, c) {
+      if (state.winner) return;
+      const key  = `${r},${c}`;
+      const tile = state.board[key];
+
+      if (tile && tile.player !== state.current_player) {
+        if (selection) {
+          onCellClick(r, c);
+        }
+        return;
+      }
+
+      if (selection?.type==='board' && selection.row===r && selection.col===c) {
+        selection  = null;
+        validMoves = [];
+        validMovesSet = new Set();
+      } else {
+        selection  = { type:'board', row:r, col:c };
+        validMoves = await fetchValidMoves(r, c);
+        validMovesSet = buildMovesSet(validMoves);
+      }
+      renderAll();
+    }
+
+    async function onCellClick(r, c) {
+      if (!selection || state.winner) return;
+
+      if (!validMovesSet.has(`${r},${c}`)) {
+        selection  = null;
+        validMoves = [];
+        validMovesSet = new Set();
+        renderAll();
+        return;
+      }
+
+      if (selection.type === 'boat_target') {
+        const r2 = await post(`${API}/plant/${GID}`, {
+          flower: 'Boat',
+          row: selection.targetRow, col: selection.targetCol,
+          displace_row: r, displace_col: c
+        });
+        if (r2.error) { showError(r2.error); return; }
+        state = r2.state;
+        canUndo = true; canRedo = false; futureHistory = []; updateUndoRedoButtons(); if (gameRunning && gamePaused) togglePause();
+        selection = null; validMoves = []; validMovesSet = new Set();
+        renderAll();
+        return;
+      }
+
+      if (selection.type === 'hand') {
+        if (selection.flower === 'Boat') {
+          const key = `${r},${c}`;
+          const target = state.board[key];
+          if (target && !ACCENT_META[target.flower]) {
+            const dr = await post(`${API}/valid_boat_displacement/${GID}`,
+              { target_row: r, target_col: c });
+            if (dr.moves && dr.moves.length > 0) {
+              selection = { type: 'boat_target', targetRow: r, targetCol: c };
+              validMoves = dr.moves;
+              validMovesSet = buildMovesSet(dr.moves);
+              renderAll();
+              return;
+            }
+          }
+        }
+        const r2 = await post(`${API}/plant/${GID}`, { flower: selection.flower, row: r, col: c });
+        if (r2.error) { showError(r2.error); return; }
+        state = r2.state;
+        canUndo = true; canRedo = false; futureHistory = []; updateUndoRedoButtons(); if (gameRunning && gamePaused) togglePause();
+      } else {
+        const r2 = await post(`${API}/arrange/${GID}`, {
+          from_row: selection.row, from_col: selection.col,
+          to_row: r, to_col: c
+        });
+        if (r2.error) { showError(r2.error); return; }
+        state = r2.state;
+        canUndo = true; canRedo = false; futureHistory = []; updateUndoRedoButtons(); if (gameRunning && gamePaused) togglePause();
+      }
+
+      selection  = null;
+      validMoves = [];
+      validMovesSet = new Set();
+      renderAll();
+    }
+
+    function showError(msg) {
+      const bar = document.getElementById('status-bar');
+      const prev = bar.textContent;
+      bar.textContent = '⚠ ' + msg;
+      bar.style.color = '#e86a6a';
+      setTimeout(() => {
+        bar.textContent = prev;
+        bar.style.color = '';
+      }, 1800);
+    }
+
+    /* ── Bot parameter definitions (populated from registry) ── */
+    let BOT_PARAMS = {};
+
+    /* Fetch agent registry and populate selects + params */
+    (async function loadAgentRegistry() {
+      try {
+        const res = await fetch('/api/agents/registry');
+        const data = await res.json();
+        for (const sel of [document.getElementById('p1-type'), document.getElementById('p2-type')]) {
+          for (const agent of data.play) {
+            if (agent.key === 'human') continue; // already present as default
+            const opt = document.createElement('option');
+            opt.value = agent.key;
+            opt.textContent = agent.display_name;
+            sel.appendChild(opt);
+          }
+        }
+        // Build BOT_PARAMS from play_params
+        for (const agent of data.play) {
+          if (agent.play_params && agent.play_params.length > 0) {
+            BOT_PARAMS[agent.key] = agent.play_params;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load agent registry:', e);
+      }
+      // Initial render so the Advanced button shows for default selections
+      // (including human → name-for-ELO field).
+      onPlayerTypeChange(1);
+      onPlayerTypeChange(2);
+    })();
+
+    function onPlayerTypeChange(p) {
+      const sel = document.getElementById(`p${p}-type`);
+      const advBtn = document.getElementById(`p${p}-adv-btn`);
+      const advPanel = document.getElementById(`p${p}-adv-panel`);
+      const botType = sel.value;
+      const paramDefs = BOT_PARAMS[botType];
+
+      advPanel.innerHTML = '';
+
+      if (botType === 'human') {
+        // Human: expose a name field as the advanced parameter so two humans
+        // at the same machine each get their own ELO entry.
+        advBtn.style.display = '';
+        const lbl = document.createElement('label');
+        lbl.innerHTML = `<span>Name (for ELO)</span>`;
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.id = `p${p}-human-name`;
+        inp.placeholder = 'Guest';
+        inp.style.width = '140px';
+        try {
+          const saved = localStorage.getItem(`The_White_Lotus_Academy_human_name_p${p}`);
+          if (saved) inp.value = saved;
+        } catch (e) {}
+        inp.addEventListener('change', () => {
+          try { localStorage.setItem(`The_White_Lotus_Academy_human_name_p${p}`, inp.value || ''); } catch (e) {}
+          syncEloSession();
+          refreshEloDisplay();
+        });
+        lbl.appendChild(inp);
+        advPanel.appendChild(lbl);
+      } else if (paramDefs && paramDefs.length > 0) {
+        advBtn.style.display = '';
+        for (const pd of paramDefs) {
+          const lbl = document.createElement('label');
+          if (pd.tooltip) lbl.title = pd.tooltip;
+          const labelSpan = document.createElement('span');
+          labelSpan.className = 'param-label';
+          labelSpan.textContent = pd.label;
+          if (pd.tooltip) {
+            const info = document.createElement('span');
+            info.className = 'info';
+            info.textContent = 'i';
+            info.title = pd.tooltip;
+            labelSpan.appendChild(info);
+          }
+          lbl.appendChild(labelSpan);
+
+          const paramType = pd.type || 'number';
+          const inp = document.createElement('input');
+          inp.id = `p${p}-param-${pd.key}`;
+          if (paramType === 'checkbox') {
+            inp.type = 'checkbox';
+            inp.checked = !!pd.default;
+          } else if (paramType === 'text') {
+            inp.type = 'text';
+            inp.value = pd.default != null ? pd.default : '';
+          } else {
+            inp.type = 'number';
+            inp.value = pd.default;
+            if (pd.min != null) inp.min = pd.min;
+            if (pd.max != null) inp.max = pd.max;
+            if (pd.step != null) inp.step = pd.step;
+          }
+          lbl.appendChild(inp);
+          advPanel.appendChild(lbl);
+        }
+      } else {
+        advBtn.style.display = 'none';
+        advPanel.classList.remove('show');
+        advBtn.classList.remove('open');
+      }
+
+      // Update header name
+      const header = document.getElementById(`p${p}-header`);
+      if (botType === 'human') {
+        header.textContent = `PLAYER ${p}`;
+      } else {
+        header.textContent = `P${p}: ${sel.options[sel.selectedIndex].text}`;
+      }
+    }
+
+    function getHumanName(p) {
+      const inp = document.getElementById(`p${p}-human-name`);
+      return inp ? (inp.value || '').trim() : '';
+    }
+
+    function toggleAdvanced(p) {
+      const btn = document.getElementById(`p${p}-adv-btn`);
+      const panel = document.getElementById(`p${p}-adv-panel`);
+      panel.classList.toggle('show');
+      btn.classList.toggle('open');
+    }
+
+    function getPlayerConfig(p) {
+      const botType = document.getElementById(`p${p}-type`).value;
+      if (botType === 'human') return { type: 'human' };
+      const paramDefs = BOT_PARAMS[botType] || [];
+      const params = {};
+      for (const pd of paramDefs) {
+        const inp = document.getElementById(`p${p}-param-${pd.key}`);
+        if (!inp) continue;
+        const paramType = pd.type || 'number';
+        if (paramType === 'checkbox')     params[pd.key] = !!inp.checked;
+        else if (paramType === 'text')    params[pd.key] = inp.value;
+        else                              params[pd.key] = parseFloat(inp.value);
+      }
+      return { type: botType, params };
+    }
+
+    let gameRunning = false;
+    let gameAborted = false;
+    let gamePaused = false;
+    let _pauseResolve = null;
+
+    function togglePause() {
+      const pauseBtn = document.getElementById('pause-btn');
+      if (!gameRunning) return;
+      if (gamePaused) {
+        gamePaused = false;
+        pauseBtn.textContent = 'Pause';
+        if (_pauseResolve) { _pauseResolve(); _pauseResolve = null; }
+      } else {
+        gamePaused = true;
+        pauseBtn.textContent = 'Resume';
+      }
+    }
+
+    function waitIfPaused() {
+      if (!gamePaused) return Promise.resolve();
+      return new Promise(resolve => { _pauseResolve = resolve; });
+    }
+
+    async function startGame() {
+      const btn = document.getElementById('start-btn');
+      const pauseBtn = document.getElementById('pause-btn');
+
+      // If game is running, stop it
+      if (gameRunning) {
+        gameAborted = true;
+        // Unblock pause if paused
+        if (_pauseResolve) { _pauseResolve(); _pauseResolve = null; }
+        return;
+      }
+
+      // Start a new game
+      await newGame();
+
+      const p1 = getPlayerConfig(1);
+      const p2 = getPlayerConfig(2);
+
+      // If both are human, nothing to drive
+      if (p1.type === 'human' && p2.type === 'human') return;
+
+      // Update agent names on server
+      const p1Name = getHumanName(1);
+      const p2Name = getHumanName(2);
+      const rated = document.getElementById('rated-toggle').checked;
+      await post(`${API}/set_agents`, {
+        p1: p1.type === 'human' ? (p1Name || 'Human') : p1.type,
+        p2: p2.type === 'human' ? (p2Name || 'Human') : p2.type,
+        p1_key: p1.type,
+        p2_key: p2.type,
+        rated: rated,
+        p1_human_name: p1Name,
+        p2_human_name: p2Name,
+      });
+      await refreshEloDisplay();
+      applyAgentNames({
+        '1': p1.type === 'human' ? null : p1.type,
+        '2': p2.type === 'human' ? null : p2.type,
+      });
+
+      gameRunning = true;
+      gameAborted = false;
+      gamePaused = false;
+      btn.textContent = 'Stop';
+      btn.classList.remove('btn-accent');
+      btn.classList.add('active');
+      pauseBtn.style.display = '';
+      pauseBtn.textContent = 'Pause';
+
+      // Disable dropdowns while running
+      document.getElementById('p1-type').disabled = true;
+      document.getElementById('p2-type').disabled = true;
+
+      await runBotLoop(p1, p2);
+
+      // Cleanup
+      gameRunning = false;
+      gameAborted = false;
+      gamePaused = false;
+      btn.textContent = 'Start Game';
+      btn.classList.add('btn-accent');
+      btn.classList.remove('active');
+      pauseBtn.style.display = 'none';
+      document.getElementById('p1-type').disabled = false;
+      document.getElementById('p2-type').disabled = false;
+    }
+
+    async function runBotLoop(p1, p2) {
+      while (!gameAborted && state && !state.winner) {
+        const cur = state.current_player;
+        const cfg = cur === 1 ? p1 : p2;
+
+        if (cfg.type === 'human') {
+          // Wait for human to play, poll for state changes
+          await new Promise(resolve => {
+            const check = setInterval(async () => {
+              if (gameAborted) { clearInterval(check); resolve(); return; }
+              try {
+                const response = await fetch(`${API}/state/${GID}`);
+                const data = await response.json();
+                if (data.state && data.state.current_player !== cur) {
+                  state = data.state;
+                  selection = null; validMoves = []; validMovesSet = new Set();
+                  renderAll();
+                  clearInterval(check);
+                  resolve();
+                } else if (data.state && data.state.winner) {
+                  state = data.state;
+                  renderAll();
+                  clearInterval(check);
+                  resolve();
+                }
+              } catch (e) {}
+            }, 500);
+          });
+          continue;
+        }
+
+        // Wait if paused
+        await waitIfPaused();
+        if (gameAborted) break;
+
+        // Bot move
+        try {
+          const r = await post(`${API}/bot_move/${GID}`, { bot: cfg.type, params: cfg.params || {} });
+          if (r.error) {
+            console.error('Bot error:', r.error);
+            break;
+          }
+          state = r.state;
+          canUndo = true; canRedo = false; futureHistory = []; updateUndoRedoButtons(); if (gameRunning && gamePaused) togglePause();
+          selection = null; validMoves = []; validMovesSet = new Set();
+          renderAll();
+
+          // Small delay so the user can see moves
+          await new Promise(r => setTimeout(r, 300));
+        } catch (e) {
+          console.error('Bot move failed:', e);
+          break;
+        }
+      }
+    }
+
+    function saveGame() {
+      if (!state) return;
+      window.location.href = `${API}/save/${GID}`;
+    }
+
+    async function loadGame(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        const r = await post(`${API}/load/${GID}`, data);
+        if (r.error) { showError(r.error); return; }
+        state = r.state;
+        cacheStaticData(state);
+        selection = null;
+        validMoves = [];
+        validMovesSet = new Set();
+        prevBoard = null;
+        prevSelection = null;
+        prevValidMovesSet = new Set();
+        handBuilt = false;
+        canUndo = false; canRedo = false; futureHistory = []; updateUndoRedoButtons();
+        renderAll();
+        document.getElementById('win-overlay').classList.remove('show');
+        try {
+          const ar = await fetch(`${API}/agents`);
+          const ad = await ar.json();
+          agentNames = ad;
+          applyAgentNames(agentNames);
+        } catch(e) {}
+      } catch(e) {
+        showError('Failed to load save file');
+      }
+      event.target.value = '';
+    }
+
+    let canUndo = false, canRedo = false;
+    let futureHistory = [];  // grayed-out moves after stepping back
+
+    function updateUndoRedoButtons() {
+      document.getElementById('undo-btn').disabled = !canUndo;
+      document.getElementById('redo-btn').disabled = !canRedo;
+    }
+
+    async function stepBack() {
+      if (!canUndo) return;
+      // Auto-pause the game if a bot loop is running
+      if (gameRunning && !gamePaused) togglePause();
+      // Save the last history entry before undo removes it
+      const prevHist = state.history || [];
+      try {
+        const r = await post(`${API}/undo/${GID}`);
+        if (r.error) { showError(r.error); return; }
+        state = r.state;
+        canUndo = r.can_undo;
+        canRedo = r.can_redo;
+        // The removed move goes to the front of futureHistory
+        const newHist = state.history || [];
+        if (prevHist.length > newHist.length) {
+          futureHistory.unshift(prevHist[prevHist.length - 1]);
+        }
+        selection = null; validMoves = []; validMovesSet = new Set();
+        prevBoard = null;
+        updateUndoRedoButtons();
+        renderAll();
+      } catch(e) { showError('Undo failed'); }
+    }
+
+    async function stepForward() {
+      if (!canRedo) return;
+      try {
+        const r = await post(`${API}/redo/${GID}`);
+        if (r.error) { showError(r.error); return; }
+        state = r.state;
+        canUndo = r.can_undo;
+        canRedo = r.can_redo;
+        // Remove the restored move from futureHistory
+        if (futureHistory.length > 0) futureHistory.shift();
+        selection = null; validMoves = []; validMovesSet = new Set();
+        prevBoard = null;
+        updateUndoRedoButtons();
+        renderAll();
+      } catch(e) { showError('Redo failed'); }
+    }
+
+    initBoard();
+    newGame();
+
+    // Keep ELO display up to date when selection changes.
+    document.getElementById('p1-type').addEventListener('change', async () => {
+      await syncEloSession();
+      refreshEloDisplay();
+    });
+    document.getElementById('p2-type').addEventListener('change', async () => {
+      await syncEloSession();
+      refreshEloDisplay();
+    });
+    document.getElementById('rated-toggle').addEventListener('change', syncEloSession);
+    // Initial sync
+    setTimeout(async () => {
+      await syncEloSession();
+      refreshEloDisplay();
+    }, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# ----------------------------------------------------------------------
+# Basic CNN example config file
+# ----------------------------------------------------------------------
+#
+# This file demonstrates the registry `config_file` field. The training
+# script (ai/training/cnn_basic_training.py) does NOT actually read it
+# config file for any agent.
+#
+# Format: one "key=value" per line. Lines starting with '#' are comments.
+# ----------------------------------------------------------------------
+
+# --- Self-play loop ---
+n=200
+lr=0.001
+eps=0.5
+min_eps=0.05
+decay=0.995
+ms=300
+batch=32
+resume=0
+
+# --- Hardware ---
+device=cpu
