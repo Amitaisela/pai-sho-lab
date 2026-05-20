@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import sys
@@ -10,6 +11,17 @@ from ai import elo  # noqa: E402
 from ai.logging_utils import parse_event_line  # noqa: E402
 
 _lock = threading.Lock()
+# Set whenever _state changes; consumers (SSE) wait on it instead of polling.
+_state_change = threading.Event()
+
+
+def wait_for_change(timeout):
+    """Block until simulation state changes or `timeout` seconds elapse. Auto-clears the flag."""
+    fired = _state_change.wait(timeout=timeout)
+    _state_change.clear()
+    return fired
+
+
 _state = {
     "process": None,
     "status": "idle",
@@ -53,42 +65,55 @@ def _reader_thread(process):
             if not line:
                 continue
             ev = parse_event_line(line)
+            mutated = False
             with _lock:
                 if ev is None:
                     if len(_state["log_lines"]) >= _MAX_LOG_LINES:
                         _state["log_lines"].pop(0)
                     _state["log_lines"].append(line)
                     _state["log_seq"] += 1
-                    continue
+                    mutated = True
+                elif ev.get("event") == "game_end":
+                    winner = ev.get("winner")
+                    _state["current_game"] = int(ev.get("game_id", _state["current_game"] + 1))
+                    if winner == 1:
+                        _state["p1_wins"] += 1
+                    elif winner == 2:
+                        _state["p2_wins"] += 1
+                    else:
+                        _state["draws"] += 1
+                        winner = None
+                    if _state.get("rated") and _state.get("p1_key") and _state.get("p2_key"):
+                        try:
+                            res = elo.record_game(_state["p1_key"], _state["p2_key"], winner)
+                            if res:
+                                res["game"] = _state["current_game"]
+                                _state["p1_elo"] = res["p1_after"]
+                                _state["p2_elo"] = res["p2_after"]
+                                _state["elo_events"].append(res)
+                                if len(_state["elo_events"]) > 500:
+                                    _state["elo_events"].pop(0)
+                        except Exception:
+                            logging.getLogger("simulate_manager").exception("elo record_game failed")
+                    mutated = True
+            if mutated:
+                _state_change.set()
+    except Exception as e:
+        logging.getLogger("simulate_manager").exception("reader thread failed")
+        with _lock:
+            _state["error"] = f"reader thread failed: {e}"
+        _state_change.set()
 
-                if ev.get("event") != "game_end":
-                    continue
-
-                winner = ev.get("winner")
-                _state["current_game"] = int(ev.get("game_id", _state["current_game"] + 1))
-                if winner == 1:
-                    _state["p1_wins"] += 1
-                elif winner == 2:
-                    _state["p2_wins"] += 1
-                else:
-                    _state["draws"] += 1
-                    winner = None
-                if _state.get("rated") and _state.get("p1_key") and _state.get("p2_key"):
-                    try:
-                        res = elo.record_game(_state["p1_key"], _state["p2_key"], winner)
-                        if res:
-                            res["game"] = _state["current_game"]
-                            _state["p1_elo"] = res["p1_after"]
-                            _state["p2_elo"] = res["p2_after"]
-                            _state["elo_events"].append(res)
-                            if len(_state["elo_events"]) > 500:
-                                _state["elo_events"].pop(0)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
-
-    retcode = process.wait()
+    try:
+        retcode = process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            retcode = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            retcode = -1
+        with _lock:
+            _state["error"] = "simulation process did not exit; killed"
     with _lock:
         if _state["status"] == "stopping":
             _state["status"] = "idle"
@@ -96,7 +121,9 @@ def _reader_thread(process):
             _state["status"] = "completed"
         else:
             _state["status"] = "error"
-            _state["error"] = f"Process exited with code {retcode}"
+            if not _state.get("error"):
+                _state["error"] = f"Process exited with code {retcode}"
+    _state_change.set()
 
 
 def start_simulation(p1_model, p1_params, p2_model, p2_params,
@@ -169,6 +196,7 @@ def start_simulation(p1_model, p1_params, p2_model, p2_params,
             "p2_elo": p2_elo,
             "elo_events": [],
         })
+    _state_change.set()
 
     t = threading.Thread(target=_reader_thread, args=(proc,), daemon=True)
     t.start()
@@ -182,6 +210,7 @@ def stop_simulation():
         if proc is None or _state["status"] != "running":
             return get_status()
         _state["status"] = "stopping"
+    _state_change.set()
 
     proc.terminate()
     try:
@@ -193,6 +222,7 @@ def stop_simulation():
     with _lock:
         _state["status"] = "idle"
         _state["process"] = None
+    _state_change.set()
 
     return get_status()
 

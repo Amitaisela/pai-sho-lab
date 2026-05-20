@@ -14,10 +14,12 @@ from ui.training_manager import (
     start_training, stop_training, get_status as training_status,
     get_log_tail as training_log_tail,
     get_model_info, PROJECT_ROOT,
+    wait_for_change as training_wait_for_change,
 )
 from ui.simulate_manager import (
     start_simulation, stop_simulation, get_status as simulate_status,
     get_log_tail as simulate_log_tail,
+    wait_for_change as simulate_wait_for_change,
 )
 from game.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CIRCLE,
                               ACCENT_TILES, SPECIAL_TILES, garden_of)
@@ -26,6 +28,47 @@ from ai.registry import get_agent, playable_agents, trainable_agents
 from ai import elo
 
 app = Flask(__name__)
+
+
+class _BadRequest(Exception):
+    """Raised by request validators; converted to a 400 by the error handler below."""
+
+
+@app.errorhandler(_BadRequest)
+def _handle_bad_request(e):
+    return jsonify({'error': str(e)}), 400
+
+
+_VALID_SET = set(VALID_SPACES)
+_KNOWN_TILES = set(FLOWER) | set(SPECIAL_TILES) | set(ACCENT_TILES)
+
+
+def _json_body(*required):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        raise _BadRequest("request body must be a JSON object")
+    for k in required:
+        if k not in d:
+            raise _BadRequest(f"missing field: {k}")
+    return d
+
+
+def _coord(d, r_key, c_key):
+    try:
+        r, c = int(d[r_key]), int(d[c_key])
+    except (KeyError, TypeError, ValueError):
+        raise _BadRequest(f"{r_key}/{c_key} must be integers")
+    if (r, c) not in _VALID_SET:
+        raise _BadRequest(f"({r},{c}) is not a valid board space")
+    return r, c
+
+
+def _flower_name(d, key='flower'):
+    f = d.get(key)
+    if f not in _KNOWN_TILES:
+        raise _BadRequest(f"unknown flower: {f!r}")
+    return f
+
 
 games = {}
 agent_names = {'1': None, '2': None}
@@ -146,13 +189,17 @@ def api_plant(gid):
     if g.winner:
         return jsonify({'error': 'game over'}), 400
 
-    d = request.json
+    d = _json_body('flower', 'row', 'col')
+    flower = _flower_name(d)
+    r, c = _coord(d, 'row', 'col')
+    kwargs = {}
+    if 'displace_row' in d and 'displace_col' in d:
+        dr, dc = _coord(d, 'displace_row', 'displace_col')
+        kwargs['displace_r'] = dr
+        kwargs['displace_c'] = dc
     _save_snapshot(gid)
     try:
-        kwargs = {}
-        if 'displace_row' in d: kwargs['displace_r'] = d['displace_row']
-        if 'displace_col' in d: kwargs['displace_c'] = d['displace_col']
-        g.plant(d['flower'], d['row'], d['col'], **kwargs)
+        g.plant(flower, r, c, **kwargs)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
@@ -167,10 +214,12 @@ def api_arrange(gid):
     if g.winner:
         return jsonify({'error': 'game over'}), 400
 
-    d = request.json
+    d = _json_body('from_row', 'from_col', 'to_row', 'to_col')
+    fr, fc = _coord(d, 'from_row', 'from_col')
+    tr, tc = _coord(d, 'to_row', 'to_col')
     _save_snapshot(gid)
     try:
-        g.arrange(d['from_row'], d['from_col'], d['to_row'], d['to_col'])
+        g.arrange(fr, fc, tr, tc)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
 
@@ -182,8 +231,9 @@ def api_valid_moves(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    d = request.json
-    moves = g.valid_destinations(d['row'], d['col'])
+    d = _json_body('row', 'col')
+    r, c = _coord(d, 'row', 'col')
+    moves = g.valid_destinations(r, c)
     return jsonify({'moves': moves})
 
 
@@ -192,8 +242,8 @@ def api_valid_boat_displacement(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    d = request.json
-    tr, tc = d['target_row'], d['target_col']
+    d = _json_body('target_row', 'target_col')
+    tr, tc = _coord(d, 'target_row', 'target_col')
     target_tile = g.board.get((tr, tc))
     if not target_tile:
         return jsonify({'moves': []})
@@ -221,7 +271,7 @@ def api_valid_plant_moves(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    d = request.json
+    d = _json_body()
     tile = d.get('tile', '')
     player = g.current_player
 
@@ -240,14 +290,18 @@ def api_valid_plant_moves(gid):
 
 @app.route('/api/set_state/<gid>', methods=['POST'])
 def api_set_state(gid):
-    games[gid] = PaiShoGame.from_dict(request.json)
+    d = _json_body('board', 'hands', 'current_player')
+    try:
+        games[gid] = PaiShoGame.from_dict(d)
+    except (KeyError, TypeError, ValueError) as e:
+        return jsonify({'error': f'invalid state: {e}'}), 400
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/set_agents', methods=['POST'])
 def api_set_agents():
     global agent_names
-    d = request.json or {}
+    d = request.get_json(silent=True) or {}
     agent_names = {'1': d.get('p1', 'Player 1'), '2': d.get('p2', 'Player 2')}
     if 'p1_key' in d:
         elo_session['p1_key'] = d.get('p1_key')
@@ -590,7 +644,9 @@ def api_training_stream():
                 sent_seq = seq
             if st in ("idle", "completed", "error"):
                 break
-            time.sleep(0.5)
+            # Block until the manager signals a state change (or 2s timeout
+            # as a heartbeat / disconnect-detection floor).
+            training_wait_for_change(2.0)
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 
@@ -721,7 +777,7 @@ def api_simulate_stream():
                 sent_seq = seq
             if st in ("idle", "completed", "error"):
                 break
-            time.sleep(0.4)
+            simulate_wait_for_change(2.0)
     return Response(generate(), mimetype='text/event-stream',
                     headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
 

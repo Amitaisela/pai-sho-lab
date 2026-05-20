@@ -124,18 +124,29 @@ class PaiShoGame:
 
     @classmethod
     def from_dict(cls, d):
+        if not isinstance(d, dict):
+            raise TypeError("from_dict expects a dict")
+        if not isinstance(d.get('board'), dict):
+            raise TypeError("'board' must be an object mapping 'r,c' -> tile")
+        if not isinstance(d.get('hands'), dict):
+            raise TypeError("'hands' must be an object")
+        if d.get('current_player') not in (1, 2):
+            raise ValueError("'current_player' must be 1 or 2")
         game = cls()
-        game.board = {
-            tuple(map(int, pos_str.split(','))): tile
-            for pos_str, tile in d['board'].items()
-        }
+        try:
+            game.board = {
+                tuple(map(int, pos_str.split(','))): tile
+                for pos_str, tile in d['board'].items()
+            }
+        except (AttributeError, ValueError) as e:
+            raise ValueError(f"malformed board key: {e}")
         hands = d['hands']
         game.hands = {
             1: hands.get('1', hands.get(1, {})),
             2: hands.get('2', hands.get(2, {})),
         }
         game.current_player = d['current_player']
-        game.winner = d['winner']
+        game.winner = d.get('winner')
         game.message = d.get('message', '')
         game.bonus_turn = d.get('bonus_turn', False)
         game.history = [list(a) for a in d.get('history', [])]
@@ -386,6 +397,14 @@ class PaiShoGame:
         source_tile = self.board.pop((fr, fc))
         saved_zhash = self._zhash
 
+        # Pre-scan once: which players have a blooming White Lotus outside a gate?
+        # Used to gate Orchid attack/defense capture rules; was previously an O(board)
+        # scan inside the inner BFS loop for every candidate cell.
+        has_blooming_wl = {1: False, 2: False}
+        for pos2, t in self.board.items():
+            if t['flower'] == 'WhiteLotus' and not t['growing'] and pos2 not in _GATES_SET:
+                has_blooming_wl[t['player']] = True
+
         try:
             while queue:
                 curr_r, curr_c, dist = queue.popleft()
@@ -407,22 +426,11 @@ class PaiShoGame:
                             if flower in SPECIAL_TILES:
                                 if flower == 'Orchid':
                                     # Orchid captures any flower only if the mover has a blooming White Lotus outside a gate.
-                                    can_capture = any(
-                                        t['flower'] == 'WhiteLotus' and not t['growing']
-                                        and pos2 not in _GATES_SET
-                                        for pos2, t in self.board.items()
-                                        if t['player'] == player
-                                    )
+                                    can_capture = has_blooming_wl[player]
                             else:
                                 if occ['flower'] == 'Orchid':
                                     # Orchid is capturable only when its own owner has a blooming White Lotus outside a gate.
-                                    orchid_owner = occ['player']
-                                    can_capture = any(
-                                        t['flower'] == 'WhiteLotus' and not t['growing']
-                                        and pos2 not in _GATES_SET
-                                        for pos2, t in self.board.items()
-                                        if t['player'] == orchid_owner
-                                    )
+                                    can_capture = has_blooming_wl[occ['player']]
                                 elif occ['flower'] not in ACCENT_TILES and occ['flower'] != 'WhiteLotus':
                                     can_capture = self.is_clash(flower, occ['flower'])
 

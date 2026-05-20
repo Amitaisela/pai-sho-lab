@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import subprocess
@@ -14,6 +15,17 @@ from ai.registry import get_agent, trainable_agents
 from ai.logging_utils import parse_event_line
 
 _lock = threading.Lock()
+# Set whenever _training_state changes; consumers (SSE) wait on it instead of polling.
+_state_change = threading.Event()
+
+
+def wait_for_change(timeout):
+    """Block until the training state changes or `timeout` seconds elapse. Auto-clears the flag."""
+    fired = _state_change.wait(timeout=timeout)
+    _state_change.clear()
+    return fired
+
+
 _training_state = {
     "process": None,
     "model": None,
@@ -185,10 +197,23 @@ def _reader_thread(process, model):
                         _training_state["current_episode"] = parsed["episode"]
                     if "total" in parsed:
                         _training_state["total_episodes"] = parsed["total"]
-    except Exception:
-        pass
+            _state_change.set()
+    except Exception as e:
+        logging.getLogger("training_manager").exception("reader thread failed")
+        with _lock:
+            _training_state["error"] = f"reader thread failed: {e}"
+        _state_change.set()
 
-    retcode = process.wait()
+    try:
+        retcode = process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            retcode = process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            retcode = -1
+        with _lock:
+            _training_state["error"] = "training process did not exit; killed"
     with _lock:
         if _training_state["status"] == "stopping":
             _training_state["status"] = "idle"
@@ -196,7 +221,9 @@ def _reader_thread(process, model):
             _training_state["status"] = "completed"
         else:
             _training_state["status"] = "error"
-            _training_state["error"] = f"Process exited with code {retcode}"
+            if not _training_state.get("error"):
+                _training_state["error"] = f"Process exited with code {retcode}"
+    _state_change.set()
 
 
 def start_training(model, params):
@@ -265,6 +292,7 @@ def start_training(model, params):
             "start_time": time.time(),
             "error": None,
         })
+    _state_change.set()
 
     t = threading.Thread(target=_reader_thread, args=(proc, model), daemon=True)
     t.start()
@@ -278,6 +306,7 @@ def stop_training():
         if proc is None or _training_state["status"] != "running":
             return get_status()
         _training_state["status"] = "stopping"
+    _state_change.set()
 
     proc.terminate()
     try:
