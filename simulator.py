@@ -17,33 +17,47 @@ GAME_ID = "default"
 log = get_logger("simulator")
 
 
+def _coerce_scalar(v):
+    for cast in (int, float):
+        try:
+            return cast(v)
+        except ValueError:
+            pass
+    return v
+
+
 def parse_model_spec(spec):
     """Parse "modelname" or "modelname:key=val,..." into (name, params)."""
     if ':' not in spec:
-        return spec, {}
+        name = spec.strip()
+        if not name:
+            raise ValueError(f"empty agent spec: {spec!r}")
+        return name, {}
     name, params_str = spec.split(':', 1)
+    name = name.strip()
+    if not name:
+        raise ValueError(f"empty agent name in spec: {spec!r}")
     params = {}
     for kv in params_str.split(','):
         kv = kv.strip()
-        if '=' not in kv:
+        if not kv:
             continue
+        if '=' not in kv:
+            raise ValueError(f"bad param {kv!r} in agent spec {spec!r} (expected key=value)")
         k, v = kv.split('=', 1)
-        v = v.strip()
-        try:
-            v = int(v)
-        except ValueError:
-            try:
-                v = float(v)
-            except ValueError:
-                pass
-        params[k.strip()] = v
-    return name.strip(), params
+        k = k.strip()
+        if not k:
+            raise ValueError(f"empty key in agent spec {spec!r}")
+        params[k] = _coerce_scalar(v.strip())
+    return name, params
 
 
 def load_model(model, params=None, verbose=True):
     params = params or {}
     entry = get_agent(model)
-    if not entry or entry["kind"] != "class":
+    if not entry:
+        raise ValueError(f"unknown agent: {model!r}")
+    if entry["kind"] != "class":
         return None
 
     if verbose:

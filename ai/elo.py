@@ -14,6 +14,16 @@ K = 32
 
 _lock = threading.Lock()
 
+# Process-local caches: ratings and history files are only written from this
+# process (Flask). Subprocesses (simulator) emit EVENT lines and the manager
+# turns them into record_game() calls here, so we own the writer side and
+# can safely keep the parsed dicts in memory between calls. mtime is tracked
+# defensively in case the file is edited externally.
+_ratings_cache = None
+_ratings_mtime = None
+_history_cache = None
+_history_mtime = None
+
 
 def _load_json(path, default):
     if not os.path.exists(path):
@@ -25,6 +35,13 @@ def _load_json(path, default):
         return default
 
 
+def _file_mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
 def _atomic_write(path, data):
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
@@ -33,21 +50,49 @@ def _atomic_write(path, data):
 
 
 def _load_ratings():
-    return _load_json(RATINGS_PATH, {})
+    global _ratings_cache, _ratings_mtime
+    cur = _file_mtime(RATINGS_PATH)
+    if _ratings_cache is not None and cur == _ratings_mtime:
+        return _ratings_cache
+    _ratings_cache = _load_json(RATINGS_PATH, {})
+    _ratings_mtime = cur
+    return _ratings_cache
 
 
 def _save_ratings(ratings):
-    _atomic_write(RATINGS_PATH, ratings)
+    global _ratings_cache, _ratings_mtime
+    try:
+        _atomic_write(RATINGS_PATH, ratings)
+    except Exception:
+        _ratings_cache = None
+        _ratings_mtime = None
+        raise
+    _ratings_cache = ratings
+    _ratings_mtime = _file_mtime(RATINGS_PATH)
 
 
 def _load_history():
-    return _load_json(HISTORY_PATH, [])
+    global _history_cache, _history_mtime
+    cur = _file_mtime(HISTORY_PATH)
+    if _history_cache is not None and cur == _history_mtime:
+        return _history_cache
+    _history_cache = _load_json(HISTORY_PATH, [])
+    _history_mtime = cur
+    return _history_cache
 
 
 def _append_history(entry):
+    global _history_cache, _history_mtime
     history = _load_history()
     history.append(entry)
-    _atomic_write(HISTORY_PATH, history)
+    try:
+        _atomic_write(HISTORY_PATH, history)
+    except Exception:
+        _history_cache = None
+        _history_mtime = None
+        raise
+    _history_cache = history
+    _history_mtime = _file_mtime(HISTORY_PATH)
 
 
 def is_human_key(agent_key):
