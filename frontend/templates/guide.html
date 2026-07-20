@@ -337,9 +337,9 @@
     <!-- Overview -->
     <h2><span class="step-num">1</span> Create the Agent Class</h2>
 
-    <p>Create a new file in <code>ai/rl/</code> (or <code>ai/classical/</code>). Your agent class must implement one method:</p>
+    <p>Create a new file in <code>engine/ai/rl/</code> (or <code>engine/ai/classical/</code>). Your agent class must implement one method:</p>
 
-    <pre><code><span class="dim"># ai/rl/my_agent.py</span>
+    <pre><code><span class="dim"># engine/ai/rl/my_agent.py</span>
 
 class MyAgent:
     def __init__(self, player=1, load=False, **kwargs):
@@ -372,11 +372,11 @@ class MyAgent:
     <!-- Step 2 -->
     <h2><span class="step-num">2</span> Create a Training Script <span class="dim">(optional)</span></h2>
 
-    <p>If your model is trainable, add a script at <code>ai/training/my_agent_training.py</code>. It should:</p>
+    <p>If your model is trainable, add a script at <code>engine/ai/training/my_agent_training.py</code>. It should:</p>
     <ul>
         <li>Accept hyperparameters as CLI arguments (e.g. <code>--n</code>, <code>--lr</code>, <code>--eps</code>).</li>
         <li>Print progress to stdout so the training dashboard can parse it.</li>
-        <li>Save the trained model to <code>ai/params/MyAgent/</code>.</li>
+        <li>Save the trained model to <code>data/params/MyAgent/</code>.</li>
     </ul>
 
     <h3>Stdout format for live progress</h3>
@@ -399,7 +399,7 @@ Generation 25</code></pre>
     </div>
 
     <!-- Step 3 -->
-    <h2><span class="step-num">3</span> Register in <code>ai/registry.py</code></h2>
+    <h2><span class="step-num">3</span> Register in <code>engine/ai/registry.py</code></h2>
 
     <p>Add one dictionary entry to the <code>AGENTS</code> list. Here's a minimal example for a trainable agent:</p>
 
@@ -413,8 +413,8 @@ Generation 25</code></pre>
     "play_kwargs": {"player": 1, "load": True},  <span class="dim"># constructor args for play</span>
     "needs_player": True,                <span class="dim"># set agent.player each turn</span>
     "play_params": [],                   <span class="dim"># runtime-tunable params (game UI)</span>
-    "model_path": "ai/params/MyAgent/model.pt",   <span class="dim"># where weights live</span>
-    "training_script": "ai/training/my_agent_training.py",
+    "model_path": "data/params/MyAgent/model.pt",   <span class="dim"># where weights live</span>
+    "training_script": "engine/ai/training/my_agent_training.py",
     "training_params": [                 <span class="dim"># shown on training page</span>
         {"key": "episodes", "label": "Episodes", "type": "number",
          "default": 5000, "step": 500, "min": 1,
@@ -461,15 +461,15 @@ Generation 25</code></pre>
     <ul>
         <li>Your agent appears in the <strong>game page</strong> player dropdowns automatically.</li>
         <li>If trainable, it appears on the <strong>training page</strong> with its own model card and hyperparameter form.</li>
-        <li>The <strong>simulator</strong> (<code>python simulator.py --p1 my_agent</code>) can load it with no changes.</li>
+        <li>The <strong>simulator</strong> (<code>python backend/simulator.py --p1 my_agent</code>) can load it with no changes.</li>
     </ul>
 
     <h3>Testing your agent</h3>
     <pre><code><span class="dim"># Quick check: run a local game</span>
-python simulator.py --mode local --p1 my_agent --p2 random --n 1
+python backend/simulator.py --mode local --p1 my_agent --p2 random --n 1
 
 <span class="dim"># Train from the UI</span>
-python ui/server.py
+python backend/ui/server.py
 <span class="dim"># Open http://localhost:5000/train and select your model</span>
 
 <span class="dim"># Run the test suite</span>
@@ -478,9 +478,9 @@ python tests/test.py</code></pre>
     <h3>File checklist</h3>
     <table class="field-table">
         <tr><th>File</th><th>Action</th></tr>
-        <tr><td><code>ai/rl/my_agent.py</code></td><td>New &mdash; agent class with <code>choose_action()</code></td></tr>
-        <tr><td><code>ai/training/my_agent_training.py</code></td><td>New &mdash; training script with CLI args (optional)</td></tr>
-        <tr><td><code>ai/registry.py</code></td><td>Edit &mdash; add one dict entry to <code>AGENTS</code></td></tr>
+        <tr><td><code>engine/ai/rl/my_agent.py</code></td><td>New &mdash; agent class with <code>choose_action()</code></td></tr>
+        <tr><td><code>engine/ai/training/my_agent_training.py</code></td><td>New &mdash; training script with CLI args (optional)</td></tr>
+        <tr><td><code>engine/ai/registry.py</code></td><td>Edit &mdash; add one dict entry to <code>AGENTS</code></td></tr>
     </table>
 </div>
 

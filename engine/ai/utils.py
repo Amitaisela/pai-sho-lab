@@ -1,3 +1,8 @@
+import os
+
+DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'data'))
+
+
 def _ring_threat_level(harmonies):
     """Return 0, 1, or 2 based on how close the player is to a harmony ring."""
     n_h = len(harmonies)

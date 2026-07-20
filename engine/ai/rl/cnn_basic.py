@@ -23,11 +23,10 @@ import torch.nn.functional as F
 from game.PaiShoGame import (
     BOARD_SIZE, VALID_SPACES, ACCENT_TILES, CIRCLE, SPECIAL_TILES,
 )
+from ai.utils import DATA_DIR
 
 
-MODEL_PATH = os.path.join(
-    os.path.dirname(__file__), '..', 'params', 'CNNBasic', 'cnn_basic.pt'
-)
+MODEL_PATH = os.path.join(DATA_DIR, 'params', 'CNNBasic', 'cnn_basic.pt')
 
 IN_CHANNELS = 8
 CONV_CHANNELS = 16

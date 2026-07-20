@@ -5,7 +5,7 @@ import sys
 import threading
 import time
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, PROJECT_ROOT)
 from ai import elo  # noqa: E402
 from ai.logging_utils import parse_event_line  # noqa: E402
@@ -137,7 +137,7 @@ def start_simulation(p1_model, p1_params, p2_model, p2_params,
     p2_spec = _build_spec(p2_model, p2_params)
 
     cmd = [
-        sys.executable, "-u", os.path.join(PROJECT_ROOT, "simulator.py"),
+        sys.executable, "-u", os.path.join(PROJECT_ROOT, "backend", "simulator.py"),
         "--mode", "local",
         "--p1", p1_spec,
         "--p2", p2_spec,

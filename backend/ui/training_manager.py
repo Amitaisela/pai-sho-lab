@@ -8,7 +8,7 @@ import threading
 import time
 from datetime import datetime
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
 from ai.registry import get_agent, trainable_agents

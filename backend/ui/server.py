@@ -7,7 +7,7 @@ import subprocess
 import threading
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from flask import Flask, jsonify, request, send_from_directory, Response, render_template
 from ui.training_manager import (
@@ -27,7 +27,13 @@ from game.notation import game_to_psn, psn_to_game
 from ai.registry import get_agent, playable_agents, trainable_agents
 from ai import elo
 
-app = Flask(__name__)
+_FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend'))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_FRONTEND_DIR, 'templates'),
+    static_folder=os.path.join(_FRONTEND_DIR, 'static'),
+)
 
 
 class _BadRequest(Exception):
@@ -124,7 +130,7 @@ def serialize(game: PaiShoGame) -> dict:
 
 @app.route('/')
 def root():
-    return send_from_directory('.', 'templates/index.html')
+    return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates'), 'index.html')
 
 
 @app.route('/api/new_game', methods=['POST'])
@@ -323,7 +329,7 @@ def api_get_agents():
 
 @app.route('/leaderboard')
 def leaderboard_page():
-    return send_from_directory('.', 'templates/leaderboard.html')
+    return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates'), 'leaderboard.html')
 
 
 @app.route('/api/elo/leaderboard', methods=['GET'])
@@ -573,21 +579,21 @@ def train_page():
 
 @app.route('/guide')
 def guide_page():
-    return send_from_directory('.', 'templates/guide.html')
+    return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates'), 'guide.html')
 
 
 @app.route('/rules')
 def rules_page():
-    return send_from_directory('.', 'templates/rules.html')
+    return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates'), 'rules.html')
 
 
 @app.route('/api/example/<filename>')
 def download_example(filename):
     ALLOWED = {
-        'basic_minimax.py': os.path.join(PROJECT_ROOT, 'ai', 'classical', 'basic_minimax.py'),
-        'cnn_basic.py': os.path.join(PROJECT_ROOT, 'ai', 'rl', 'cnn_basic.py'),
-        'cnn_basic_training.py': os.path.join(PROJECT_ROOT, 'ai', 'training', 'cnn_basic_training.py'),
-        'registry.py': os.path.join(PROJECT_ROOT, 'ai', 'registry.py'),
+        'basic_minimax.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'classical', 'basic_minimax.py'),
+        'cnn_basic.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'rl', 'cnn_basic.py'),
+        'cnn_basic_training.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'training', 'cnn_basic_training.py'),
+        'registry.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'registry.py'),
     }
     path = ALLOWED.get(filename)
     if not path or not os.path.exists(path):
@@ -716,7 +722,7 @@ def api_agents_registry():
 
 @app.route('/simulate')
 def simulate_page():
-    return send_from_directory('.', 'templates/simulate.html')
+    return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates'), 'simulate.html')
 
 
 @app.route('/api/simulate/start', methods=['POST'])

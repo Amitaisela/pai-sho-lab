@@ -49,7 +49,7 @@ pip install -r requirements.txt
 ## Running
 
 ```bash
-python ui/server.py
+python backend/ui/server.py
 ```
 
 Open http://localhost:5000. Everything — training, simulation, leaderboard, play — is driven from the web UI.
@@ -69,10 +69,10 @@ First-time use: open the **Train** page, pick an agent, set hyperparameters, and
 
 `cnn_basic` is a two-layer convolutional value network over an 8-channel 19×19 board encoding (piece planes, player-to-move, gate/zone masks). At play time the agent enumerates every legal action, applies it to a cloned game, scores the resulting state with the net, and picks the highest-scoring move — a one-ply greedy search, no lookahead.
 
-The network ships with trained weights at [ai/params/CNNBasic/cnn_basic.pt](ai/params/CNNBasic/cnn_basic.pt), so it plays competently out of the box. If you want to improve on it, re-train via the Train page or directly:
+The network ships with trained weights at [data/params/CNNBasic/cnn_basic.pt](data/params/CNNBasic/cnn_basic.pt), so it plays competently out of the box. If you want to improve on it, re-train via the Train page or directly:
 
 ```bash
-python ai/training/cnn_basic_training.py --n 200 --lr 1e-3 --eps 0.5 --opponent self
+python engine/ai/training/cnn_basic_training.py --n 200 --lr 1e-3 --eps 0.5 --opponent self
 ```
 
 It's a good template for anyone wiring up a small neural-net agent: the training loop, checkpoint format, and registry entry are all minimal and can be copied as-is.
@@ -84,21 +84,23 @@ It's a good template for anyone wiring up a small neural-net agent: the training
 ### Project main files
 
 ```
-game/PaiShoGame.py       — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
+engine/game/PaiShoGame.py — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
 
-ai/registry.py           — Single source of truth for every agent (UI config, training config, CLI mapping)
-ai/training/             — One training script per trainable agent
-ai/params/               — Saved weights / checkpoints (.pkl, .pt)
-ai/utils.py              — Shared helpers
-ai/elo.py                — Elo bookkeeping
-ai/logging_utils.py      — logging
+engine/ai/registry.py    — Single source of truth for every agent (UI config, training config, CLI mapping)
+engine/ai/training/      — One training script per trainable agent
+engine/ai/utils.py       — Shared helpers + DATA_DIR constant
+engine/ai/elo.py         — Elo bookkeeping
+engine/ai/logging_utils.py — logging
 
-ui/server.py             — Flask app + REST endpoints
-ui/simulate_manager.py   — Spawns simulator.py subprocesses for the Simulate page
-ui/training_manager.py   — Spawns training scripts, parses their stdout for the Train page
-ui/templates/            — index, simulate, train, leaderboard, guide, rules
+data/params/             — Saved weights / checkpoints (.pkl, .pt)
 
-simulator.py             — Headless game runner (subprocess target)
+backend/ui/server.py     — Flask app + REST endpoints
+backend/ui/simulate_manager.py — Spawns simulator.py subprocesses for the Simulate page
+backend/ui/training_manager.py — Spawns training scripts, parses their stdout for the Train page
+backend/simulator.py     — Headless game runner (subprocess target)
+
+frontend/templates/      — index, simulate, train, leaderboard, guide, rules
+
 tests/                   — test.py (engine unit tests) + test_integration.py (end-to-end)
 ```
 
@@ -111,17 +113,17 @@ tests/                   — test.py (engine unit tests) + test_integration.py (
 
 ### The registry
 
-[ai/registry.py](ai/registry.py) is the **single source of truth** for every agent. The game UI, Simulate page, Train page, and simulator all read from it. Adding a new agent = adding one entry to `AGENTS`. No UI code needs to change — forms, dropdowns, and CLI wiring are generated from the entry.
+[engine/ai/registry.py](engine/ai/registry.py) is the **single source of truth** for every agent. The game UI, Simulate page, Train page, and simulator all read from it. Adding a new agent = adding one entry to `AGENTS`. No UI code needs to change — forms, dropdowns, and CLI wiring are generated from the entry.
 
 ---
 
 ### Adding a new model you can train
 
-Every piece below wires together through [ai/registry.py](ai/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([ai/classical/basic_minimax.py](ai/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([ui/templates/guide.html](ui/templates/guide.html)).
+Every piece below wires together through [engine/ai/registry.py](engine/ai/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([engine/ai/classical/basic_minimax.py](engine/ai/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([frontend/templates/guide.html](frontend/templates/guide.html)).
 
 #### 1. Write the agent class
 
-Create `ai/rl/my_agent.py`. It must:
+Create `engine/ai/rl/my_agent.py`. It must:
 
 - Define a class with a constructor accepting at minimum `player`, `load=True`, and any play-time knobs you expose.
 - Implement `choose_action(self, game, verbose=False)` returning a valid action tuple.
@@ -147,11 +149,11 @@ class MyAgent:
 
 #### 2. Write the training script
 
-Create `ai/training/my_agent_training.py`, if it's needed. It must:
+Create `engine/ai/training/my_agent_training.py`, if it's needed. It must:
 
 - Accept its hyperparameters as CLI flags using `argparse` — the names must match the right-hand side of `training_cli_map` in your registry entry.
 - Run self-play (or play against a fixed opponent), update the model, and **save checkpoints to `model_path`** periodically and at the end.
-- Log progress with `ai/logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
+- Log progress with `ai.logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
 - Support `--resume` to load the existing checkpoint and continue.
 
 Minimal skeleton:
@@ -184,7 +186,7 @@ if __name__ == "__main__":
 
 #### 3. Register it
 
-Append one entry to the `AGENTS` list in [ai/registry.py](ai/registry.py):
+Append one entry to the `AGENTS` list in [engine/ai/registry.py](engine/ai/registry.py):
 
 ```python
 {
@@ -205,10 +207,10 @@ Append one entry to the `AGENTS` list in [ai/registry.py](ai/registry.py):
     ],
 
     # Where checkpoints live. The UI shows "Model trained ✓" if this exists.
-    "model_path": "ai/params/MyAgent/model.pt",
+    "model_path": "data/params/MyAgent/model.pt",
 
     # Training script + the knobs that drive it.
-    "training_script": "ai/training/my_agent_training.py",
+    "training_script": "engine/ai/training/my_agent_training.py",
     "training_params": [
         {"key": "episodes", "label": "Episodes",      "type": "number",   "default": 5000, "step": 500, "min": 1},
         {"key": "lr",       "label": "Learning Rate", "type": "number",   "default": 1e-3, "step": 1e-4, "min": 1e-5, "max": 0.1},
@@ -224,7 +226,7 @@ Append one entry to the `AGENTS` list in [ai/registry.py](ai/registry.py):
     # Which form field is "total episodes" (drives the progress bar).
     "total_episodes_key": "episodes",
 
-    # Name of the stdout line parser in ui/training_manager.py.
+    # Name of the stdout line parser in backend/ui/training_manager.py.
     # Use "basic_minimax" if your log line matches that format, or add a new parser.
     "log_parser": "basic_minimax",
 
