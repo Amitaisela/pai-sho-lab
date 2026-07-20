@@ -56,6 +56,21 @@ Open http://localhost:5000. Everything — training, simulation, leaderboard, pl
 
 First-time use: open the **Train** page, pick an agent, set hyperparameters, and start a run. When it finishes, head to **Simulate** to benchmark the trained agent against a baseline and watch the Elo update on the **Leaderboard**.
 
+## Running with Docker
+
+```bash
+cp .env.example .env   # fill in TS_AUTHKEY (a Tailscale auth key: https://login.tailscale.com/admin/settings/keys)
+docker compose up
+```
+
+This builds the app image and brings up two containers: `backend` (the Flask app) and `tailscale` (a sidecar that joins your tailnet). The app is reachable at both `http://localhost:5000` on the host and `http://mushibot:5000` from any other device on your tailnet — no port forwarding, nothing publicly exposed. `./data` is mounted into the container, so weights, checkpoints, saved games, and results persist across rebuilds.
+
+GPU access is requested by default (needed for training with `cnn_basic`, `nneu_basic`, `ppo`, `set_transformer`); it requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host. On a machine without a GPU, run with the CPU override instead:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up
+```
+
 ## Agents that ship with this template
 
 | Agent | Description |
