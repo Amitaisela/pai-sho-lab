@@ -37,5 +37,5 @@ Homepage = "https://github.com/Amitaisela/pai-sho-lab"
 Repository = "https://github.com/Amitaisela/pai-sho-lab"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["engine", "backend"]
 include = ["ai*", "game*", "ui*"]

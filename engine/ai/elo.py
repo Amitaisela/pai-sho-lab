@@ -5,7 +5,7 @@ import time
 
 from ai.registry import get_agent
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 RATINGS_PATH = os.path.join(PROJECT_ROOT, 'elo_ratings.json')
 HISTORY_PATH = os.path.join(PROJECT_ROOT, 'elo_history.json')
 

@@ -105,7 +105,7 @@ def get_action(game, model, legal_actions, agent=None, params=None, verbose=True
 def save_result_to_csv(p1_model, p2_model, winner, turn_count, duration):
     p1_name = p1_model.split(':')[0]
     p2_name = p2_model.split(':')[0]
-    file_path = f"results/{p1_name}_vs_{p2_name}_results.csv"
+    file_path = f"data/results/{p1_name}_vs_{p2_name}_results.csv"
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
 
@@ -121,7 +121,7 @@ def save_result_to_csv(p1_model, p2_model, winner, turn_count, duration):
 def save_game_to_file(game, game_id, p1_spec, p2_spec):
     p1_name = p1_spec.split(':')[0]
     p2_name = p2_spec.split(':')[0]
-    dir_path = f"SavedGames/{p1_name}_vs_{p2_name}"
+    dir_path = f"data/saved_games/{p1_name}_vs_{p2_name}"
     os.makedirs(dir_path, exist_ok=True)
     file_path = os.path.join(dir_path, f"game_{game_id}.json")
     save_data = game.to_save_dict(p1_name=p1_spec, p2_name=p2_spec)
@@ -133,7 +133,7 @@ def save_game_to_file(game, game_id, p1_spec, p2_spec):
 def save_game_to_psn(game, game_id, p1_spec, p2_spec):
     p1_name = p1_spec.split(':')[0]
     p2_name = p2_spec.split(':')[0]
-    dir_path = f"SavedGames/{p1_name}_vs_{p2_name}"
+    dir_path = f"data/saved_games/{p1_name}_vs_{p2_name}"
     os.makedirs(dir_path, exist_ok=True)
     file_path = os.path.join(dir_path, f"game_{game_id}.psn")
     with open(file_path, 'w') as f:
@@ -337,7 +337,7 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
                 save_data = resp.json()
                 p1n = p1_spec.split(':')[0]
                 p2n = p2_spec.split(':')[0]
-                dir_path = f"SavedGames/{p1n}_vs_{p2n}"
+                dir_path = f"data/saved_games/{p1n}_vs_{p2n}"
                 os.makedirs(dir_path, exist_ok=True)
                 file_path = os.path.join(dir_path, f"game_{i + 1}.json")
                 with open(file_path, 'w') as f:

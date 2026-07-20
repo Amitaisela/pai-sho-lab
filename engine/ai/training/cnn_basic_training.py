@@ -7,7 +7,7 @@ moves toward the game's final outcome (+1 for the eventual winner,
 -1 for the loser, 0 for a draw / step-limit timeout) from that
 player's perspective. Simple, no TD, no bootstrapping.
 
-Registry exposes ai/params/CNNBasic/example_config.txt as a
+Registry exposes data/params/CNNBasic/example_config.txt as a
 `config_file` for demonstration. This script intentionally does NOT
 read it — the file exists only to show the registry feature.
 """

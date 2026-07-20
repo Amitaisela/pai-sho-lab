@@ -1,6 +1,6 @@
 tests/test_report.txt
 logs/
-ai/checkpoints
+data/checkpoints
 elo_history.json
 elo_ratings.json
 future.txt
