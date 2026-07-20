@@ -67,7 +67,7 @@
           background: var(--panel);
           display: flex;
           align-items: center;
-          justify-content: space-between;
+          gap: 12px;
           padding: 0 16px;
           border-bottom: 1px solid var(--border);
           flex-shrink: 0;
@@ -79,7 +79,10 @@
           letter-spacing: .02em;
         }
         .logo span { font-weight: 400; color: var(--text-dim); }
-        .header-actions { display: flex; gap: 6px; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-actions { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+        .nav-links { display: flex; align-items: center; gap: 12px; }
+        .hamburger-btn { display: none; }
 
         /* ── Buttons ── */
         .btn {
@@ -557,23 +560,51 @@
         }
         .adv-panel .info:hover { background: var(--accent); color: #fff; }
 
-        @media (max-width: 600px) {
-          .player-panel { display: none; }
-          main { padding: 0 8px 24px; }
+        @media (max-width: 700px) {
+          header {
+            height: auto;
+            flex-wrap: wrap;
+            row-gap: 8px;
+            padding: 8px 12px;
+          }
+          .hamburger-btn { display: inline-flex; }
+          .nav-links {
+            display: none;
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+            gap: 6px;
+            order: 10;
+          }
+          .nav-links.open { display: flex; }
+          .header-actions { flex-wrap: wrap; width: 100%; }
+
+          main {
+            flex-direction: column;
+            align-items: center;
+            padding: 0 8px 24px;
+          }
+          .player-panel {
+            width: 100%;
+            max-width: 420px;
+          }
         }
     </style>
 </head>
 <body>
 
 <header>
-    <div style="display:flex;align-items:center;gap:12px;">
+    <div class="header-left">
         <div class="logo">Skud <span>Pai Sho</span></div>
+        <button class="btn hamburger-btn" id="nav-toggle-btn" onclick="toggleNavMenu()" aria-label="Menu" aria-expanded="false">&#9776;</button>
+    </div>
+    <nav class="nav-links" id="nav-links">
         <a href="/train" class="btn" style="text-decoration:none;">Train</a>
         <a href="/simulate" class="btn" style="text-decoration:none;">Simulate</a>
         <a href="/leaderboard" class="btn" style="text-decoration:none;">Leaderboard</a>
         <a href="/rules" class="btn" style="text-decoration:none;">Rules</a>
         <a href="/guide" class="btn" style="text-decoration:none;">Guide</a>
-    </div>
+    </nav>
     <div class="header-actions">
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Whether game results count toward ELO ratings">
             <input type="checkbox" id="rated-toggle" checked> Rated
@@ -676,17 +707,24 @@
         const main = document.getElementById('main-layout');
         if (!main) return;
 
-        let occupied = 0;
-        document.querySelectorAll('.player-panel').forEach(p => {
-            if (getComputedStyle(p).display !== 'none') {
-                occupied += p.offsetWidth;
-            }
-        });
+        // Below the mobile breakpoint, main-layout stacks panels above/below
+        // the board (see the @media block) instead of beside it — so they no
+        // longer compete with the board for horizontal space.
+        const stacked = getComputedStyle(main).flexDirection === 'column';
 
-        const visiblePanels = [...document.querySelectorAll('.player-panel')]
-            .filter(p => getComputedStyle(p).display !== 'none').length;
-        const gapPx = 16;
-        occupied += visiblePanels * gapPx;
+        let occupied = 0;
+        if (!stacked) {
+            document.querySelectorAll('.player-panel').forEach(p => {
+                if (getComputedStyle(p).display !== 'none') {
+                    occupied += p.offsetWidth;
+                }
+            });
+
+            const visiblePanels = [...document.querySelectorAll('.player-panel')]
+                .filter(p => getComputedStyle(p).display !== 'none').length;
+            const gapPx = 16;
+            occupied += visiblePanels * gapPx;
+        }
 
         const mainPadding = 32;
         const availableForBoard = main.offsetWidth - occupied - mainPadding;
@@ -1000,11 +1038,29 @@
       handBuilt = true;
     }
 
+    let _lastScrolledPlayer = 1;
+
+    function maybeScrollToActivePanel(cur) {
+      // On phones, the two player panels are stacked full-height above/below
+      // the board — jump to whichever one just became active so you're not
+      // hunting up/down the page for your hand each turn. Skip it on wider
+      // viewports (panels sit side-by-side there, nothing to scroll to) and
+      // skip AI turns (nothing to interact with, would just yank the screen
+      // away from the board mid-move).
+      if (window.innerWidth > 700) { _lastScrolledPlayer = cur; return; }
+      if (cur === _lastScrolledPlayer) return;
+      _lastScrolledPlayer = cur;
+      const isHuman = document.getElementById(`p${cur}-type`)?.value === 'human';
+      if (!isHuman) return;
+      document.getElementById(`p${cur}-panel`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     function renderHands() {
       buildHands();
       const cur = state.current_player;
       document.getElementById('p1-header').classList.toggle('active', cur===1 && !state.winner);
       document.getElementById('p2-header').classList.toggle('active', cur===2 && !state.winner);
+      if (!state.winner) maybeScrollToActivePanel(cur);
 
       for (const p of [1, 2]) {
         const hand = state.hands[String(p)];
@@ -1385,6 +1441,13 @@
       const panel = document.getElementById(`p${p}-adv-panel`);
       panel.classList.toggle('show');
       btn.classList.toggle('open');
+    }
+
+    function toggleNavMenu() {
+      const nav = document.getElementById('nav-links');
+      const btn = document.getElementById('nav-toggle-btn');
+      const open = nav.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
 
     function getPlayerConfig(p) {

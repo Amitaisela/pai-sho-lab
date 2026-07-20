@@ -1,14 +1,13 @@
-import importlib
 import requests
 import time
 import os
 import json
-import random
 import argparse
 from tqdm import tqdm
 from game.PaiShoGame import PaiShoGame
 from game.notation import game_to_psn
 from ai.registry import get_agent
+from ai.agent_loader import instantiate, act
 from ai.logging_utils import get_logger, log_event
 
 SERVER_URL = "http://127.0.0.1:5000"
@@ -63,43 +62,18 @@ def load_model(model, params=None, verbose=True):
     if verbose:
         log.info(f"Loading {entry['display_name']} agent...")
 
-    mod = importlib.import_module(entry["module"])
-    cls = getattr(mod, entry["class_name"])
-    kwargs = dict(entry.get("play_kwargs", {}))
-    for pd in entry.get("play_params", []):
-        if pd["key"] in params:
-            kwargs[pd["key"]] = params[pd["key"]]
-    return cls(**kwargs)
+    return instantiate(entry, params=params)
 
 
 def get_action(game, model, legal_actions, agent=None, params=None, verbose=True):
-    params = params or {}
     entry = get_agent(model)
     if not entry:
         raise ValueError(f"Model '{model}' is not registered in ai/registry.py.")
 
-    kind = entry["kind"]
+    if entry["kind"] == "class" and agent is None:
+        raise ValueError(f"{entry['display_name']} agent instance not provided to get_action.")
 
-    if kind == "inline":
-        return random.choice(legal_actions)
-
-    if kind == "function":
-        mod = importlib.import_module(entry["module"])
-        func = getattr(mod, entry["function_name"])
-        kwargs = dict(entry.get("function_kwargs", {}))
-        for pd in entry.get("play_params", []):
-            if pd["key"] in params:
-                kwargs[pd["key"]] = params[pd["key"]]
-        return func(game, **kwargs)
-
-    if kind == "class":
-        if agent is None:
-            raise ValueError(f"{entry['display_name']} agent instance not provided to get_action.")
-        if entry.get("needs_player"):
-            agent.player = game.current_player
-        return agent.choose_action(game, verbose)
-
-    raise ValueError(f"Unknown agent kind '{kind}' for model '{model}'.")
+    return act(entry, game, agent=agent, params=params, verbose=verbose, legal_actions=legal_actions)
 
 
 def save_result_to_csv(p1_model, p2_model, winner, turn_count, duration):

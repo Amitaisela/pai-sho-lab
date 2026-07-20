@@ -293,6 +293,14 @@
         <h2 style="margin-top:0; border-bottom:none; padding-bottom:0;">Download a Working Example</h2>
         <p>Two starter templates ship with the project — pick the one that matches the kind of agent you want to build. Both are minimal, already registered, and runnable end-to-end.</p>
 
+        <p>Or generate the files instead of downloading and renaming them by hand:</p>
+        <pre><code><span class="dim"># non-trainable, classical-search shape</span>
+python scripts/new_agent.py my_agent --template minimax
+
+<span class="dim"># trainable shape (also stubs a training script)</span>
+python scripts/new_agent.py my_agent --template cnn</code></pre>
+        <p class="dim" style="font-size:.8rem;">Both write the agent class file, register it in <code>engine/ai/registry.py</code>, and (for <code>cnn</code>) stub a training script — fill in the TODOs it leaves behind.</p>
+
         <div class="template-grid">
             <div class="template-card">
                 <h3>Basic Minimax</h3>
@@ -415,20 +423,16 @@ Generation 25</code></pre>
     "play_params": [],                   <span class="dim"># runtime-tunable params (game UI)</span>
     "model_path": "data/params/MyAgent/model.pt",   <span class="dim"># where weights live</span>
     "training_script": "engine/ai/training/my_agent_training.py",
-    "training_params": [                 <span class="dim"># shown on training page</span>
-        {"key": "episodes", "label": "Episodes", "type": "number",
-         "default": 5000, "step": 500, "min": 1,
-         "tooltip": "Number of self-play episodes"},
-        {"key": "lr", "label": "Learning Rate", "type": "number",
-         "default": 0.001, "step": 0.0001, "min": 0.00001, "max": 0.1},
-        {"key": "resume", "label": "Resume", "type": "checkbox", "default": false,
-         "tooltip": "Continue from saved checkpoint"},
+    "training_params": [                 <span class="dim"># shown on training page; use the num_param/</span>
+                                          <span class="dim"># text_param/checkbox_param helpers instead of</span>
+                                          <span class="dim"># raw dicts — see existing entries for examples</span>
+        num_param("episodes", "Episodes", 5000, step=500, min=1,
+                  tooltip="Number of self-play episodes", cli_flag="--n"),
+        num_param("lr", "Learning Rate", 0.001, step=0.0001,
+                  min=0.00001, max=0.1, cli_flag="--lr"),
+        checkbox_param("resume", "Resume", False,
+                       tooltip="Continue from saved checkpoint", cli_flag="--resume"),
     ],
-    "training_cli_map": {                <span class="dim"># param key -> CLI flag</span>
-        "episodes": "--n",
-        "lr": "--lr",
-        "resume": "--resume",
-    },
     "total_episodes_key": "episodes",    <span class="dim"># drives the progress bar</span>
     "log_parser": "ppo",                 <span class="dim"># reuse PPO's stdout parser</span>
     "config_file": null,                 <span class="dim"># editable config file path, or null</span>
@@ -445,15 +449,18 @@ Generation 25</code></pre>
         <tr><td><code>class_name</code></td><td>Class to instantiate from the module.</td></tr>
         <tr><td><code>play_kwargs</code></td><td>Dict passed to the constructor when loading for play.</td></tr>
         <tr><td><code>needs_player</code></td><td>If <code>true</code>, the system sets <code>agent.player = current_player</code> before each move.</td></tr>
-        <tr><td><code>play_params</code></td><td>Runtime-tunable parameters shown in the game UI (e.g. time budget). Each entry has: <code>key</code>, <code>label</code>, <code>default</code>, <code>min</code>, <code>max</code>, <code>step</code>.</td></tr>
+        <tr><td><code>play_params</code></td><td>Runtime-tunable parameters shown in the game UI (e.g. time budget), built with <code>num_param</code>/<code>text_param</code>/<code>checkbox_param</code> from <code>registry.py</code>.</td></tr>
         <tr><td><code>model_path</code></td><td>Relative path to saved weights. Used by the training dashboard to show file info. <code>null</code> if none.</td></tr>
         <tr><td><code>training_script</code></td><td>Relative path to the training script. <code>null</code> if not trainable (agent won't appear on training page).</td></tr>
-        <tr><td><code>training_params</code></td><td>Hyperparameter definitions for the training UI. Each entry: <code>key</code>, <code>label</code>, <code>type</code> (<code>"number"</code>, <code>"text"</code>, or <code>"checkbox"</code>), <code>default</code>, and optional <code>step</code>, <code>min</code>, <code>max</code>, <code>tooltip</code>.</td></tr>
-        <tr><td><code>training_cli_map</code></td><td>Maps <code>training_params</code> keys to CLI flags for the training script.</td></tr>
+        <tr><td><code>training_params</code></td><td>Hyperparameter definitions for the training UI, built with the same <code>num_param</code>/<code>text_param</code>/<code>checkbox_param</code> helpers. Each carries <code>key</code>, <code>label</code>, <code>type</code>, <code>default</code>, an optional <code>tooltip</code>/<code>min</code>/<code>max</code>/<code>step</code>, and a required <code>cli_flag</code> — the CLI flag on the training script this param maps to (e.g. <code>cli_flag="--n"</code>). No separate CLI-mapping table to keep in sync.</td></tr>
         <tr><td><code>total_episodes_key</code></td><td>Which <code>training_params</code> key represents the total count (drives the progress bar).</td></tr>
         <tr><td><code>log_parser</code></td><td>Key into the parser registry in <code>training_manager.py</code>. Reuse <code>"ppo"</code>, <code>"td_learning"</code>, <code>"monte_carlo"</code>, <code>"neat"</code>, or add your own.</td></tr>
         <tr><td><code>config_file</code></td><td>Path to an editable config file (shown in training UI). <code>null</code> for most agents.</td></tr>
     </table>
+
+    <div class="tip">
+        <strong>Tip:</strong> Run <code>python -m ai.registry</code> (or <code>python tests/test.py</code>) after editing the registry — <code>validate_registry()</code> checks every entry's <code>module</code>/<code>class_name</code>/<code>function_name</code> actually resolve and that every trainable param has a <code>cli_flag</code>, so typos fail immediately instead of 500ing the first time someone picks your agent in the UI.
+    </div>
 
     <!-- Step 4 (that's it) -->
     <h2>That's It</h2>

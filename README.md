@@ -136,6 +136,13 @@ tests/                   — test.py (engine unit tests) + test_integration.py (
 
 Every piece below wires together through [engine/ai/registry.py](engine/ai/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([engine/ai/classical/basic_minimax.py](engine/ai/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([frontend/templates/guide.html](frontend/templates/guide.html)).
 
+Or skip the copy-paste and generate the files + registry entry directly:
+
+```bash
+python scripts/new_agent.py my_agent --template minimax   # non-trainable
+python scripts/new_agent.py my_agent --template cnn        # trainable (stubs a training script too)
+```
+
 #### 1. Write the agent class
 
 Create `engine/ai/rl/my_agent.py`. It must:
@@ -166,7 +173,7 @@ class MyAgent:
 
 Create `engine/ai/training/my_agent_training.py`, if it's needed. It must:
 
-- Accept its hyperparameters as CLI flags using `argparse` — the names must match the right-hand side of `training_cli_map` in your registry entry.
+- Accept its hyperparameters as CLI flags using `argparse` — the names must match each training param's `cli_flag` in your registry entry.
 - Run self-play (or play against a fixed opponent), update the model, and **save checkpoints to `model_path`** periodically and at the end.
 - Log progress with `ai.logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
 - Support `--resume` to load the existing checkpoint and continue.
@@ -214,29 +221,26 @@ Append one entry to the `AGENTS` list in [engine/ai/registry.py](engine/ai/regis
     "play_kwargs": {"player": 1, "load": True},
     "needs_player": True,
 
-    # Form fields in the game UI. Types: number | checkbox | text.
+    # Form fields in the game UI, built with the num_param/text_param/checkbox_param
+    # helpers defined at the top of registry.py.
     "play_params": [
-        {"key": "temperature", "label": "Temperature", "type": "number",
-         "default": 0.0, "min": 0.0, "max": 5.0, "step": 0.05,
-         "tooltip": "0 = greedy; >0 = softmax sampling"},
+        num_param("temperature", "Temperature", 0.0, min=0.0, max=5.0, step=0.05,
+                  tooltip="0 = greedy; >0 = softmax sampling"),
     ],
 
     # Where checkpoints live. The UI shows "Model trained ✓" if this exists.
     "model_path": "data/params/MyAgent/model.pt",
 
-    # Training script + the knobs that drive it.
+    # Training script + the knobs that drive it. `cli_flag` is the CLI flag
+    # the training script's argparse expects for that field — no separate
+    # key-to-flag mapping to keep in sync.
     "training_script": "engine/ai/training/my_agent_training.py",
     "training_params": [
-        {"key": "episodes", "label": "Episodes",      "type": "number",   "default": 5000, "step": 500, "min": 1},
-        {"key": "lr",       "label": "Learning Rate", "type": "number",   "default": 1e-3, "step": 1e-4, "min": 1e-5, "max": 0.1},
-        {"key": "epsilon",  "label": "Epsilon",       "type": "number",   "default": 0.3,  "step": 0.01, "min": 0, "max": 1},
-        {"key": "resume",   "label": "Resume",        "type": "checkbox", "default": False},
+        num_param("episodes", "Episodes",      5000, step=500,  min=1,               cli_flag="--n"),
+        num_param("lr",       "Learning Rate", 1e-3, step=1e-4, min=1e-5, max=0.1,   cli_flag="--lr"),
+        num_param("epsilon",  "Epsilon",       0.3,  step=0.01, min=0,    max=1,     cli_flag="--eps"),
+        checkbox_param("resume", "Resume", False, cli_flag="--resume"),
     ],
-
-    # Form field key  →  CLI flag consumed by the training script.
-    "training_cli_map": {
-        "episodes": "--n", "lr": "--lr", "epsilon": "--eps", "resume": "--resume",
-    },
 
     # Which form field is "total episodes" (drives the progress bar).
     "total_episodes_key": "episodes",
