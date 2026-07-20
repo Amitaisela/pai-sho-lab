@@ -14,7 +14,7 @@ import traceback
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from game.PaiShoGame import (
+from PythonEngine.PaiShoGame import (
     PaiShoGame, CIRCLE, ACCENT_TILES, SPECIAL_TILES, GATES, CENTER,
     BOARD_SIZE, VALID_SPACES, is_valid, garden_of,
 )
@@ -234,7 +234,7 @@ def test_random_game_completes():
 # ---------- basic_minimax ----------
 
 def test_basic_minimax_returns_legal_action():
-    from ai.classical.basic_minimax import BasicMinimaxAgent
+    from Agents.classical.basic_minimax import BasicMinimaxAgent
     random.seed(7)
     g = _fresh()
     agent = BasicMinimaxAgent(player=1, time_budget=0.3, max_depth=1)
@@ -243,7 +243,7 @@ def test_basic_minimax_returns_legal_action():
 
 
 def test_basic_minimax_handles_bonus_turn():
-    from ai.classical.basic_minimax import BasicMinimaxAgent
+    from Agents.classical.basic_minimax import BasicMinimaxAgent
     g = _bare()
     g.step(('plant', 'Rose', GATES[0][0], GATES[0][1]))
     g.step(('plant', 'Jasmine', GATES[1][0], GATES[1][1]))
@@ -254,7 +254,7 @@ def test_basic_minimax_handles_bonus_turn():
 
 
 def test_basic_minimax_evaluate_terminal():
-    from ai.classical.basic_minimax import BasicMinimaxAgent
+    from Agents.classical.basic_minimax import BasicMinimaxAgent
     g = _fresh()
     g.winner = 1
     agent = BasicMinimaxAgent(player=1)
@@ -265,14 +265,14 @@ def test_basic_minimax_evaluate_terminal():
 # ---------- cnn_basic ----------
 
 def test_cnn_encode_board_shape():
-    from ai.rl.cnn_basic import encode_board, IN_CHANNELS
+    from Agents.rl.cnn_basic import encode_board, IN_CHANNELS
     g = _fresh()
     enc = encode_board(g, 1)
     assert enc.shape == (IN_CHANNELS, BOARD_SIZE, BOARD_SIZE)
 
 
 def test_cnn_choose_action_returns_legal():
-    from ai.rl.cnn_basic import CNNBasicAgent
+    from Agents.rl.cnn_basic import CNNBasicAgent
     random.seed(11)
     g = _fresh()
     agent = CNNBasicAgent(player=1, load=False)
@@ -283,7 +283,7 @@ def test_cnn_choose_action_returns_legal():
 def test_cnn_save_load_roundtrip(tmp_path_factory=None):
     import tempfile
     import torch
-    from ai.rl.cnn_basic import CNNBasicAgent
+    from Agents.rl.cnn_basic import CNNBasicAgent
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, 'cnn.pt')
         a = CNNBasicAgent(player=1, load=False)
@@ -298,7 +298,7 @@ def test_cnn_save_load_roundtrip(tmp_path_factory=None):
 # ---------- registry ----------
 
 def test_registry_contains_expected_agents():
-    from ai.registry import AGENTS
+    from Agents.registry import AGENTS
     keys = {a['key'] for a in AGENTS}
     for required in ('random', 'basic_minimax', 'cnn_basic'):
         assert required in keys, f'missing agent: {required}'

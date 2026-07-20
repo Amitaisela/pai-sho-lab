@@ -1,6 +1,7 @@
 tests/test_report.txt
 logs/
 data/checkpoints
+docs/
 elo_history.json
 elo_ratings.json
 future.txt

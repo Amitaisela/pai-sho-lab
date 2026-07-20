@@ -7,8 +7,8 @@ import time
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, PROJECT_ROOT)
-from ai import elo  # noqa: E402
-from ai.logging_utils import parse_event_line  # noqa: E402
+from Agents import elo  # noqa: E402
+from Agents.logging_utils import parse_event_line  # noqa: E402
 
 _lock = threading.Lock()
 # Set whenever _state changes; consumers (SSE) wait on it instead of polling.

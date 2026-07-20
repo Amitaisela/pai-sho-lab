@@ -11,8 +11,8 @@ from datetime import datetime
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, PROJECT_ROOT)
 
-from ai.registry import get_agent, trainable_agents
-from ai.logging_utils import parse_event_line
+from Agents.registry import get_agent, trainable_agents
+from Agents.logging_utils import parse_event_line
 
 _lock = threading.Lock()
 # Set whenever _training_state changes; consumers (SSE) wait on it instead of polling.

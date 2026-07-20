@@ -4,7 +4,7 @@ import os
 import sys
 import time
 
-_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'logs'))
+_LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs'))
 EVENT_PREFIX = "EVENT:"
 
 

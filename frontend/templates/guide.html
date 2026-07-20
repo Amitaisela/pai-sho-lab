@@ -365,7 +365,7 @@ python scripts/new_agent.py my_agent --template minimax
 
 <span class="dim"># trainable shape (also stubs a training script)</span>
 python scripts/new_agent.py my_agent --template cnn</code></pre>
-        <p class="dim" style="font-size:.8rem;">Both write the agent class file, register it in <code>engine/ai/registry.py</code>, and (for <code>cnn</code>) stub a training script — fill in the TODOs it leaves behind.</p>
+        <p class="dim" style="font-size:.8rem;">Both write the agent class file, register it in <code>Agents/registry.py</code>, and (for <code>cnn</code>) stub a training script — fill in the TODOs it leaves behind.</p>
 
         <div class="template-grid">
             <div class="template-card">
@@ -423,9 +423,9 @@ python scripts/new_agent.py my_agent --template cnn</code></pre>
     <!-- Overview -->
     <h2><span class="step-num">1</span> Create the Agent Class</h2>
 
-    <p>Create a new file in <code>engine/ai/rl/</code> (or <code>engine/ai/classical/</code>). Your agent class must implement one method:</p>
+    <p>Create a new file in <code>Agents/rl/</code> (or <code>Agents/classical/</code>). Your agent class must implement one method:</p>
 
-    <pre><code><span class="dim"># engine/ai/rl/my_agent.py</span>
+    <pre><code><span class="dim"># Agents/rl/my_agent.py</span>
 
 class MyAgent:
     def __init__(self, player=1, load=False, **kwargs):
@@ -458,7 +458,7 @@ class MyAgent:
     <!-- Step 2 -->
     <h2><span class="step-num">2</span> Create a Training Script <span class="dim">(optional)</span></h2>
 
-    <p>If your model is trainable, add a script at <code>engine/ai/training/my_agent_training.py</code>. It should:</p>
+    <p>If your model is trainable, add a script at <code>Agents/training/my_agent_training.py</code>. It should:</p>
     <ul>
         <li>Accept hyperparameters as CLI arguments (e.g. <code>--n</code>, <code>--lr</code>, <code>--eps</code>).</li>
         <li>Print progress to stdout so the training dashboard can parse it.</li>
@@ -485,7 +485,7 @@ Generation 25</code></pre>
     </div>
 
     <!-- Step 3 -->
-    <h2><span class="step-num">3</span> Register in <code>engine/ai/registry.py</code></h2>
+    <h2><span class="step-num">3</span> Register in <code>Agents/registry.py</code></h2>
 
     <p>Add one dictionary entry to the <code>AGENTS</code> list. Here's a minimal example for a trainable agent:</p>
 
@@ -494,13 +494,13 @@ Generation 25</code></pre>
     "display_name": "My Agent",          <span class="dim"># shown in UI</span>
     "description": "Short description",  <span class="dim"># shown on model card</span>
     "kind": "class",
-    "module": "ai.rl.my_agent",          <span class="dim"># Python import path</span>
+    "module": "Agents.rl.my_agent",          <span class="dim"># Python import path</span>
     "class_name": "MyAgent",             <span class="dim"># class to instantiate</span>
     "play_kwargs": {"player": 1, "load": True},  <span class="dim"># constructor args for play</span>
     "needs_player": True,                <span class="dim"># set agent.player each turn</span>
     "play_params": [],                   <span class="dim"># runtime-tunable params (game UI)</span>
     "model_path": "data/params/MyAgent/model.pt",   <span class="dim"># where weights live</span>
-    "training_script": "engine/ai/training/my_agent_training.py",
+    "training_script": "Agents/training/my_agent_training.py",
     "training_params": [                 <span class="dim"># shown on training page; use the num_param/</span>
                                           <span class="dim"># text_param/checkbox_param helpers instead of</span>
                                           <span class="dim"># raw dicts — see existing entries for examples</span>
@@ -523,7 +523,7 @@ Generation 25</code></pre>
         <tr><td><code>display_name</code></td><td>Human-readable name shown in both UIs.</td></tr>
         <tr><td><code>description</code></td><td>One-line description for model cards.</td></tr>
         <tr><td><code>kind</code></td><td><code>"class"</code> for agents, <code>"function"</code> for standalone functions, <code>"inline"</code> for random.</td></tr>
-        <tr><td><code>module</code></td><td>Python import path (e.g. <code>ai.rl.my_agent</code>). Lazy-imported on first use.</td></tr>
+        <tr><td><code>module</code></td><td>Python import path (e.g. <code>Agents.rl.my_agent</code>). Lazy-imported on first use.</td></tr>
         <tr><td><code>class_name</code></td><td>Class to instantiate from the module.</td></tr>
         <tr><td><code>play_kwargs</code></td><td>Dict passed to the constructor when loading for play.</td></tr>
         <tr><td><code>needs_player</code></td><td>If <code>true</code>, the system sets <code>agent.player = current_player</code> before each move.</td></tr>
@@ -537,7 +537,7 @@ Generation 25</code></pre>
     </table>
 
     <div class="tip">
-        <strong>Tip:</strong> Run <code>python -m ai.registry</code> (or <code>python tests/test.py</code>) after editing the registry — <code>validate_registry()</code> checks every entry's <code>module</code>/<code>class_name</code>/<code>function_name</code> actually resolve and that every trainable param has a <code>cli_flag</code>, so typos fail immediately instead of 500ing the first time someone picks your agent in the UI.
+        <strong>Tip:</strong> Run <code>python -m Agents.registry</code> (or <code>python tests/test.py</code>) after editing the registry — <code>validate_registry()</code> checks every entry's <code>module</code>/<code>class_name</code>/<code>function_name</code> actually resolve and that every trainable param has a <code>cli_flag</code>, so typos fail immediately instead of 500ing the first time someone picks your agent in the UI.
     </div>
 
     <!-- Step 4 (that's it) -->
@@ -563,9 +563,9 @@ python tests/test.py</code></pre>
     <h3>File checklist</h3>
     <table class="field-table">
         <tr><th>File</th><th>Action</th></tr>
-        <tr><td><code>engine/ai/rl/my_agent.py</code></td><td>New &mdash; agent class with <code>choose_action()</code></td></tr>
-        <tr><td><code>engine/ai/training/my_agent_training.py</code></td><td>New &mdash; training script with CLI args (optional)</td></tr>
-        <tr><td><code>engine/ai/registry.py</code></td><td>Edit &mdash; add one dict entry to <code>AGENTS</code></td></tr>
+        <tr><td><code>Agents/rl/my_agent.py</code></td><td>New &mdash; agent class with <code>choose_action()</code></td></tr>
+        <tr><td><code>Agents/training/my_agent_training.py</code></td><td>New &mdash; training script with CLI args (optional)</td></tr>
+        <tr><td><code>Agents/registry.py</code></td><td>Edit &mdash; add one dict entry to <code>AGENTS</code></td></tr>
     </table>
 </div>
 
