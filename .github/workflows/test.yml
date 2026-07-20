@@ -26,3 +26,15 @@ jobs:
 
       - name: Run tests
         run: python tests/basic_tests.py
+
+  test-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t pai-sho-lab:ci .
+
+      - name: Run tests inside container
+        run: docker run --rm -v "$PWD/tests:/app/tests" pai-sho-lab:ci python tests/basic_tests.py
