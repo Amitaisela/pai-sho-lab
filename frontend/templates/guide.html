@@ -269,6 +269,48 @@
           font-weight: 600;
           width: 22%;
         }
+
+        .flow {
+          display: flex;
+          align-items: stretch;
+          gap: 10px;
+          margin: 16px 0 20px;
+          flex-wrap: wrap;
+        }
+        .flow-box {
+          background: var(--bg-light);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          padding: 14px 16px;
+          flex: 1;
+          min-width: 200px;
+        }
+        .flow-box-title {
+          font-weight: 700;
+          color: var(--text-bright);
+          font-size: .85rem;
+          margin-bottom: 6px;
+        }
+        .flow-box p { font-size: .82rem; margin-bottom: 0; }
+        .flow-arrow {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: var(--text-dim);
+          font-size: 1.3rem;
+          padding: 0 2px;
+        }
+        @media (max-width: 720px) {
+          .flow { flex-direction: column; }
+          .flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+        }
+
+        .anatomy-list {
+          font-size: .8rem;
+          padding-left: 18px;
+          margin-bottom: 10px;
+        }
+        .anatomy-list li { margin-bottom: 4px; }
     </style>
 </head>
 <body>
@@ -288,6 +330,30 @@
     <h1>How to Add a New AI Model</h1>
     <p class="subtitle">Three files. Zero plumbing. The game UI, training page, and simulator pick it up automatically.</p>
 
+    <!-- Orientation -->
+    <div class="tip" style="margin-bottom:20px;">
+        <strong>Start here:</strong> every agent in this project is built from up to three files, and each one has exactly one job. Skim this before opening the examples below &mdash; it's why the two starter templates don't look alike.
+    </div>
+
+    <div class="flow">
+        <div class="flow-box">
+            <div class="flow-box-title">1. Agent class <span class="dim" style="font-weight:400;">&mdash; always required</span></div>
+            <p>The decision-maker. One method, <code>choose_action(game)</code>, that looks at the current board and returns a move. Every agent needs this file and nothing else is mandatory.</p>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box">
+            <div class="flow-box-title">2. Registry entry <span class="dim" style="font-weight:400;">&mdash; always required</span></div>
+            <p>One dict added to <code>registry.py</code> &mdash; your agent's business card: a name, where to import it from, whether it's trainable. The Play, Train, Simulate, and Leaderboard pages all read this list; you never touch those pages directly.</p>
+        </div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-box">
+            <div class="flow-box-title">3. Training script <span class="dim" style="font-weight:400;">&mdash; only if trainable</span></div>
+            <p>A separate program that plays the agent against itself thousands of times and saves improved weights to disk. Skip it entirely if your agent has nothing to learn &mdash; e.g. it's pure search over hand-picked numbers.</p>
+        </div>
+    </div>
+
+    <p>That's the whole reason <code>basic_minimax.py</code> and <code>cnn_basic.py</code> look so different below: one ships files 1 and 2, the other ships all three. They sit at opposite ends of the same spectrum &mdash; a human wrote the "knowledge" for one; a training loop grinds it out for the other. Same interface, same registry shape, wildly different insides.</p>
+
     <!-- Download example -->
     <div class="example-box">
         <h2 style="margin-top:0; border-bottom:none; padding-bottom:0;">Download a Working Example</h2>
@@ -306,6 +372,12 @@ python scripts/new_agent.py my_agent --template cnn</code></pre>
                 <h3>Basic Minimax</h3>
                 <div class="tagline">Classical · Search-based</div>
                 <p>Depth-limited alpha-beta with a hand-crafted linear evaluator (harmony count, material, ring distance, opponent threat). No neural net, no gradients — just search + a few hardcoded weights.</p>
+                <p class="dim" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px;">Inside the file</p>
+                <ul class="anatomy-list">
+                    <li><code>evaluate()</code> — the hand-tuned scoring formula: counts harmonies, ring distance, material, opponent threats</li>
+                    <li><code>_alphabeta()</code> — the tree search that plays moves ahead and keeps the best-scoring line</li>
+                    <li>No training script — the numbers in <code>evaluate()</code> <em>are</em> the whole "model"; there's nothing to learn</li>
+                </ul>
                 <div class="downloads">
                     <a href="/api/example/basic_minimax.py" class="btn btn-accent" download>basic_minimax.py <span class="dim" style="font-weight:400;">— agent class</span></a>
                     <a href="/api/example/registry.py" class="btn btn-accent" download>registry.py <span class="dim" style="font-weight:400;">— registration</span></a>
@@ -316,6 +388,12 @@ python scripts/new_agent.py my_agent --template cnn</code></pre>
                 <h3>Basic CNN</h3>
                 <div class="tagline">Learned · Value network</div>
                 <p>Tiny two-layer convolutional value network over an 8-channel 19×19 board tensor. Greedy 1-ply lookahead picks the move leading to the highest-valued successor state. Trained by self-play value-regression.</p>
+                <p class="dim" style="font-size:.78rem; text-transform:uppercase; letter-spacing:.02em; margin-bottom:4px;">Inside the files</p>
+                <ul class="anatomy-list">
+                    <li><code>encode_board()</code> — turns the board dict into an 8-channel tensor the network can actually read</li>
+                    <li><code>BasicCNN</code> — the network itself: two conv layers + a linear "how good is this position" head</li>
+                    <li><code>cnn_basic_training.py</code> — plays the net against itself, nudges its guesses toward who actually won, saves the weights</li>
+                </ul>
                 <div class="downloads">
                     <a href="/api/example/cnn_basic.py" class="btn btn-accent" download>cnn_basic.py <span class="dim" style="font-weight:400;">— agent class</span></a>
                     <a href="/api/example/cnn_basic_training.py" class="btn btn-accent" download>cnn_basic_training.py <span class="dim" style="font-weight:400;">— training script</span></a>
@@ -324,10 +402,10 @@ python scripts/new_agent.py my_agent --template cnn</code></pre>
             </div>
         </div>
 
-        <h3 style="margin-top:20px;">Why two templates?</h3>
-        <p>The agent interface here (<code>choose_action(game)</code>) is deliberately loose — it doesn't care whether your decision comes from tree search, a neural net, a lookup table, or a coin flip. Shipping <em>both</em> a classical search agent and a learned value network makes that clear by example: each template demonstrates a different part of the plumbing (registry entries with/without training, config files, log parsers, weight persistence), and together they cover the two branches almost every new agent falls into. Copy the one that matches your idea; the other tells you what the <em>other</em> branch of the registry looks like.</p>
+        <h3 style="margin-top:20px;">Which one should I copy?</h3>
+        <p>If your agent's intelligence is a formula or search you can write down directly — rules, heuristics, MCTS — start from <strong>Basic Minimax</strong>; you'll only ever touch files 1 and 2. If it should get better by playing itself over and over — a neural net, a Q-table, anything reward- or gradient-trained — start from <strong>Basic CNN</strong>; <code>cnn_basic_training.py</code> is the template for file 3. Both register the exact same way, so the <code>registry.py</code> download is identical either way.</p>
 
-        <h3>How they differ</h3>
+        <h3>How they differ, side by side</h3>
         <table class="compare-table">
             <tr><th>Aspect</th><th>Basic Minimax</th><th>Basic CNN</th></tr>
             <tr><td>Decision</td><td>Alpha-beta tree search to fixed depth</td><td>1-ply greedy over a learned state value</td></tr>
