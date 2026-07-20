@@ -7,8 +7,8 @@ Looks up any registry entry by key and returns a callable
 
 import random as _rnd
 
-from ai.registry import get_agent
-from ai.agent_loader import instantiate, act
+from Agents.registry import get_agent
+from Agents.agent_loader import instantiate, act
 
 
 def load_opponent(name):

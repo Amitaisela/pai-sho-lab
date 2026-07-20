@@ -9,7 +9,7 @@ The net is intentionally tiny (two conv layers + a linear head) so the
 model trains in minutes and stays readable as a reference. It has NO
 dependency on TD learning or any other agent's feature extractor.
 
-Companion training script: ai/training/cnn_basic_training.py.
+Companion training script: Agents/training/cnn_basic_training.py.
 """
 
 import os
@@ -20,10 +20,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from game.PaiShoGame import (
+from PythonEngine.PaiShoGame import (
     BOARD_SIZE, VALID_SPACES, ACCENT_TILES, CIRCLE, SPECIAL_TILES,
 )
-from ai.utils import DATA_DIR
+from Agents.utils import DATA_DIR
 
 
 MODEL_PATH = os.path.join(DATA_DIR, 'params', 'CNNBasic', 'cnn_basic.pt')

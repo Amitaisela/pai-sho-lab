@@ -5,14 +5,14 @@ function. There is nothing to train: the evaluation coefficients are
 hardcoded. Use this as the reference for wiring up a non-trainable
 agent in the registry.
 
-For a trainable reference template, see ai/rl/cnn_basic.py.
+For a trainable reference template, see Agents/rl/cnn_basic.py.
 """
 
 import random
 import time
 
-from game.PaiShoGame import ACCENT_TILES
-from ai.utils import _ring_threat_level, _ring_completion_distance
+from PythonEngine.PaiShoGame import ACCENT_TILES
+from Agents.utils import _ring_threat_level, _ring_completion_distance
 
 
 TILE_VALUE = {

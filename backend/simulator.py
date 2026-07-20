@@ -4,11 +4,11 @@ import os
 import json
 import argparse
 from tqdm import tqdm
-from game.PaiShoGame import PaiShoGame
-from game.notation import game_to_psn
-from ai.registry import get_agent
-from ai.agent_loader import instantiate, act
-from ai.logging_utils import get_logger, log_event
+from PythonEngine.PaiShoGame import PaiShoGame
+from PythonEngine.notation import game_to_psn
+from Agents.registry import get_agent
+from Agents.agent_loader import instantiate, act
+from Agents.logging_utils import get_logger, log_event
 
 SERVER_URL = "http://127.0.0.1:5000"
 GAME_ID = "default"
@@ -68,7 +68,7 @@ def load_model(model, params=None, verbose=True):
 def get_action(game, model, legal_actions, agent=None, params=None, verbose=True):
     entry = get_agent(model)
     if not entry:
-        raise ValueError(f"Model '{model}' is not registered in ai/registry.py.")
+        raise ValueError(f"Model '{model}' is not registered in Agents/registry.py.")
 
     if entry["kind"] == "class" and agent is None:
         raise ValueError(f"{entry['display_name']} agent instance not provided to get_action.")

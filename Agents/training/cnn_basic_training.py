@@ -23,10 +23,10 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
-from game.PaiShoGame import PaiShoGame
-from ai.rl.cnn_basic import CNNBasicAgent, encode_board, MODEL_PATH
-from ai.logging_utils import get_logger, log_event
-from ai.training.opponent_utils import load_opponent
+from PythonEngine.PaiShoGame import PaiShoGame
+from Agents.rl.cnn_basic import CNNBasicAgent, encode_board, MODEL_PATH
+from Agents.logging_utils import get_logger, log_event
+from Agents.training.opponent_utils import load_opponent
 
 
 def _reward_from_player_view(winner, player):

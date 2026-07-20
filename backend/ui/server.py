@@ -20,12 +20,12 @@ from ui.simulate_manager import (
     get_log_tail as simulate_log_tail,
     wait_for_change as simulate_wait_for_change,
 )
-from game.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CIRCLE,
+from PythonEngine.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CIRCLE,
                               ACCENT_TILES, SPECIAL_TILES, garden_of)
-from game.notation import game_to_psn, psn_to_game
-from ai.registry import get_agent, playable_agents, trainable_agents
-from ai.agent_loader import instantiate, act
-from ai import elo
+from PythonEngine.notation import game_to_psn, psn_to_game
+from Agents.registry import get_agent, playable_agents, trainable_agents
+from Agents.agent_loader import instantiate, act
+from Agents import elo
 
 _FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend'))
 
@@ -575,10 +575,10 @@ def rules_page():
 @app.route('/api/example/<filename>')
 def download_example(filename):
     ALLOWED = {
-        'basic_minimax.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'classical', 'basic_minimax.py'),
-        'cnn_basic.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'rl', 'cnn_basic.py'),
-        'cnn_basic_training.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'training', 'cnn_basic_training.py'),
-        'registry.py': os.path.join(PROJECT_ROOT, 'engine', 'ai', 'registry.py'),
+        'basic_minimax.py': os.path.join(PROJECT_ROOT, 'Agents', 'classical', 'basic_minimax.py'),
+        'cnn_basic.py': os.path.join(PROJECT_ROOT, 'Agents', 'rl', 'cnn_basic.py'),
+        'cnn_basic_training.py': os.path.join(PROJECT_ROOT, 'Agents', 'training', 'cnn_basic_training.py'),
+        'registry.py': os.path.join(PROJECT_ROOT, 'Agents', 'registry.py'),
     }
     path = ALLOWED.get(filename)
     if not path or not os.path.exists(path):

@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY pyproject.toml requirements.txt ./
+COPY Agents/ Agents/
 COPY engine/ engine/
 COPY backend/ backend/
 COPY frontend/ frontend/

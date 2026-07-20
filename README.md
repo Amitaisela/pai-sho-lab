@@ -87,7 +87,7 @@ docker compose -f docker-compose.yml -f docker-compose.cpu.yml up
 The network ships with trained weights at [data/params/CNNBasic/cnn_basic.pt](data/params/CNNBasic/cnn_basic.pt), so it plays competently out of the box. If you want to improve on it, re-train via the Train page or directly:
 
 ```bash
-python engine/ai/training/cnn_basic_training.py --n 200 --lr 1e-3 --eps 0.5 --opponent self
+python Agents/training/cnn_basic_training.py --n 200 --lr 1e-3 --eps 0.5 --opponent self
 ```
 
 It's a good template for anyone wiring up a small neural-net agent: the training loop, checkpoint format, and registry entry are all minimal and can be copied as-is.
@@ -99,13 +99,13 @@ It's a good template for anyone wiring up a small neural-net agent: the training
 ### Project main files
 
 ```
-engine/game/PaiShoGame.py — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
+engine/PythonEngine/PaiShoGame.py — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
 
-engine/ai/registry.py    — Single source of truth for every agent (UI config, training config, CLI mapping)
-engine/ai/training/      — One training script per trainable agent
-engine/ai/utils.py       — Shared helpers + DATA_DIR constant
-engine/ai/elo.py         — Elo bookkeeping
-engine/ai/logging_utils.py — logging
+Agents/registry.py    — Single source of truth for every agent (UI config, training config, CLI mapping)
+Agents/training/      — One training script per trainable agent
+Agents/utils.py       — Shared helpers + DATA_DIR constant
+Agents/elo.py         — Elo bookkeeping
+Agents/logging_utils.py — logging
 
 data/params/             — Saved weights / checkpoints (.pkl, .pt)
 
@@ -128,13 +128,13 @@ tests/                   — test.py (engine unit tests) + test_integration.py (
 
 ### The registry
 
-[engine/ai/registry.py](engine/ai/registry.py) is the **single source of truth** for every agent. The game UI, Simulate page, Train page, and simulator all read from it. Adding a new agent = adding one entry to `AGENTS`. No UI code needs to change — forms, dropdowns, and CLI wiring are generated from the entry.
+[Agents/registry.py](Agents/registry.py) is the **single source of truth** for every agent. The game UI, Simulate page, Train page, and simulator all read from it. Adding a new agent = adding one entry to `AGENTS`. No UI code needs to change — forms, dropdowns, and CLI wiring are generated from the entry.
 
 ---
 
 ### Adding a new model you can train
 
-Every piece below wires together through [engine/ai/registry.py](engine/ai/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([engine/ai/classical/basic_minimax.py](engine/ai/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([frontend/templates/guide.html](frontend/templates/guide.html)).
+Every piece below wires together through [Agents/registry.py](Agents/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([Agents/classical/basic_minimax.py](Agents/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([frontend/templates/guide.html](frontend/templates/guide.html)).
 
 Or skip the copy-paste and generate the files + registry entry directly:
 
@@ -145,7 +145,7 @@ python scripts/new_agent.py my_agent --template cnn        # trainable (stubs a 
 
 #### 1. Write the agent class
 
-Create `engine/ai/rl/my_agent.py`. It must:
+Create `Agents/rl/my_agent.py`. It must:
 
 - Define a class with a constructor accepting at minimum `player`, `load=True`, and any play-time knobs you expose.
 - Implement `choose_action(self, game, verbose=False)` returning a valid action tuple.
@@ -171,18 +171,18 @@ class MyAgent:
 
 #### 2. Write the training script
 
-Create `engine/ai/training/my_agent_training.py`, if it's needed. It must:
+Create `Agents/training/my_agent_training.py`, if it's needed. It must:
 
 - Accept its hyperparameters as CLI flags using `argparse` — the names must match each training param's `cli_flag` in your registry entry.
 - Run self-play (or play against a fixed opponent), update the model, and **save checkpoints to `model_path`** periodically and at the end.
-- Log progress with `ai.logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
+- Log progress with `Agents.logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
 - Support `--resume` to load the existing checkpoint and continue.
 
 Minimal skeleton:
 
 ```python
 import argparse
-from ai.logging_utils import get_logger, log_event
+from Agents.logging_utils import get_logger, log_event
 
 def main():
     ap = argparse.ArgumentParser()
@@ -208,7 +208,7 @@ if __name__ == "__main__":
 
 #### 3. Register it
 
-Append one entry to the `AGENTS` list in [engine/ai/registry.py](engine/ai/registry.py):
+Append one entry to the `AGENTS` list in [Agents/registry.py](Agents/registry.py):
 
 ```python
 {
@@ -216,7 +216,7 @@ Append one entry to the `AGENTS` list in [engine/ai/registry.py](engine/ai/regis
     "display_name": "My Agent",
     "description": "One-line summary shown in the UI",
     "kind": "class",
-    "module": "ai.rl.my_agent",
+    "module": "Agents.rl.my_agent",
     "class_name": "MyAgent",
     "play_kwargs": {"player": 1, "load": True},
     "needs_player": True,
@@ -234,7 +234,7 @@ Append one entry to the `AGENTS` list in [engine/ai/registry.py](engine/ai/regis
     # Training script + the knobs that drive it. `cli_flag` is the CLI flag
     # the training script's argparse expects for that field — no separate
     # key-to-flag mapping to keep in sync.
-    "training_script": "engine/ai/training/my_agent_training.py",
+    "training_script": "Agents/training/my_agent_training.py",
     "training_params": [
         num_param("episodes", "Episodes",      5000, step=500,  min=1,               cli_flag="--n"),
         num_param("lr",       "Learning Rate", 1e-3, step=1e-4, min=1e-5, max=0.1,   cli_flag="--lr"),
