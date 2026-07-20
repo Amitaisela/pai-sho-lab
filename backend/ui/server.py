@@ -1,4 +1,3 @@
-import importlib
 import os
 import sys
 import json
@@ -25,6 +24,7 @@ from game.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CI
                               ACCENT_TILES, SPECIAL_TILES, garden_of)
 from game.notation import game_to_psn, psn_to_game
 from ai.registry import get_agent, playable_agents, trainable_agents
+from ai.agent_loader import instantiate, act
 from ai import elo
 
 _FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend'))
@@ -469,13 +469,7 @@ def _get_bot_agent(bot_type, params):
         return None
 
     try:
-        mod = importlib.import_module(entry["module"])
-        cls = getattr(mod, entry["class_name"])
-        kwargs = dict(entry.get("play_kwargs", {}))
-        for pd in entry.get("play_params", []):
-            if pd["key"] in params:
-                kwargs[pd["key"]] = params[pd["key"]]
-        agent = cls(**kwargs)
+        agent = instantiate(entry, params=params)
     except Exception:
         return None
 
@@ -495,27 +489,18 @@ def _bot_choose_action(game, bot_type, params):
 
     kind = entry["kind"]
 
-    if kind == "inline":
-        return random.choice(legal_actions)
-
-    if kind == "function":
-        mod = importlib.import_module(entry["module"])
-        func = getattr(mod, entry["function_name"])
-        kwargs = dict(entry.get("function_kwargs", {}))
-        for pd in entry.get("play_params", []):
-            if pd["key"] in params:
-                kwargs[pd["key"]] = params[pd["key"]]
-        return func(game, **kwargs)
-
     if kind == "class":
         agent = _get_bot_agent(key, params)
         if agent is None:
             return random.choice(legal_actions)
-        for pd in entry.get("play_params", []):
-            setattr(agent, pd["key"], params.get(pd["key"], pd["default"]))
-        if entry.get("needs_player"):
-            agent.player = game.current_player
-        return agent.choose_action(game, verbose=False)
+        # Every play_param is re-applied each turn, falling back to its own
+        # default when absent, so a stale override never lingers on the
+        # cached agent instance.
+        synced = {pd["key"]: params.get(pd["key"], pd["default"]) for pd in entry.get("play_params", [])}
+        return act(entry, game, agent=agent, params=synced, verbose=False, legal_actions=legal_actions)
+
+    if kind in ("inline", "function"):
+        return act(entry, game, params=params, verbose=False, legal_actions=legal_actions)
 
     return random.choice(legal_actions)
 

@@ -238,13 +238,11 @@ def start_training(model, params):
     python = sys.executable
     cmd = [python, "-u", entry["training_script"]]
 
-    cli_map = entry.get("training_cli_map", {})
     training_params = entry.get("training_params", [])
 
-    defaults = {tp["key"]: tp["default"] for tp in training_params}
-
-    for param_key, cli_flag in cli_map.items():
-        value = params.get(param_key, defaults.get(param_key))
+    for tp in training_params:
+        param_key, cli_flag = tp["key"], tp["cli_flag"]
+        value = params.get(param_key, tp["default"])
         if value is None:
             continue
         # resume accepts either a bool (on/off) or a path to a checkpoint.
@@ -276,6 +274,7 @@ def start_training(model, params):
                    for i, a in enumerate(cmd)]
     cmd_line = "$ " + " ".join(display_cmd)
 
+    defaults = {tp["key"]: tp["default"] for tp in training_params}
     ep_key = entry.get("total_episodes_key")
     total = params.get(ep_key, defaults.get(ep_key, 0)) if ep_key else 0
 
