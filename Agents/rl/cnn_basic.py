@@ -38,7 +38,6 @@ for _r, _c in VALID_SPACES:
 
 def encode_board(game, player):
     """Return an (IN_CHANNELS, 19, 19) float32 tensor from `player`'s view."""
-    opponent = 3 - player
     x = np.zeros((IN_CHANNELS, BOARD_SIZE, BOARD_SIZE), dtype=np.float32)
     # Ch 7: static valid-square mask.
     x[7] = _VALID_MASK

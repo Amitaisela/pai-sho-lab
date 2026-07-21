@@ -1,6 +1,7 @@
 # Pai Sho Lab
 
 [![Tests](https://github.com/Amitaisela/pai-sho-lab/actions/workflows/test.yml/badge.svg)](https://github.com/Amitaisela/pai-sho-lab/actions/workflows/test.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -30,6 +31,24 @@ When you start Pai Sho Lab and open it in your browser, you get:
 - **Play** — a clickable board for sanity-checking an agent against a human, or spectating agent-vs-agent games.
 
 Out of the box you can train `cnn_basic` and tune `basic_minimax`'s evaluation weights. To build up a roster of smarter agents, see [Adding a new model you can train](#adding-a-new-model-you-can-train) below.
+
+For the architecture behind the registry, the engine internals, and why each agent is built the way it is, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Where this repo comes from
+
+Pai Sho Lab isn't hand-maintained as a standalone project — it's an **auto-published mirror**. The actual research happens in a private, full-size codebase (`MushiBot`) that carries a much larger agent roster: classical alpha-beta search, MCTS with RAVE, tabular and linear RL (Q-learning, TD(λ)), an NNUE-style quantised value net, PPO with GAE, a Set Transformer policy, and a NEAT-evolved network — plus all of their training scripts, checkpoints, and internal tooling.
+
+On every push to `main` in that private repo, CI runs a distillation script (`scripts/distill.py` — kept private, see step 3 below for why it isn't shipped here) that:
+
+1. Prunes the agent registry down to three agents: `random`, `basic_minimax`, `cnn_basic`.
+2. Deletes every other agent's implementation, training script, and saved weights.
+3. Strips the deploy/distillation machinery itself (`scripts/`, CI secrets, checkpoints) so it can't ship recursively.
+4. Swaps in a test-only CI workflow — the one whose badge is at the top of this README — so this repo can't trigger its own deploy.
+5. Force-pushes the pruned tree here, as a real commit carrying the original commit message plus a `Synced from Amitaisela/MushiBot@<sha>` trailer, so `git log` here still tells you when each change actually landed upstream.
+
+In other words: what you're looking at is a **generated, working subset** of a larger system, republished automatically so it stays trivial to clone, read end to end, and use as a template — without dragging along research code, trained weights, or infrastructure that isn't relevant to someone extending it. Adding an agent here follows exactly the pattern described below; it just won't be one of the ones the private repo keeps to itself.
 
 ---
 
