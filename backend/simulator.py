@@ -166,7 +166,7 @@ def print_report(results, p1_spec, p2_spec, total_time):
     avg_duration = sum(durations) / n
 
     log.info(f"\n{'=' * 50}")
-    log.info(f"  SIMULATION REPORT")
+    log.info("  SIMULATION REPORT")
     log.info(f"{'=' * 50}")
     log.info(f"  Matchup:  P1 ({p1_name}) vs P2 ({p2_name})")
     log.info(f"  Games played: {n}")

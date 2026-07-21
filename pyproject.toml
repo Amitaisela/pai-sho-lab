@@ -39,3 +39,15 @@ Repository = "https://github.com/Amitaisela/pai-sho-lab"
 [tool.setuptools.packages.find]
 where = [".", "engine", "backend"]
 include = ["Agents*", "PythonEngine*", "ui*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# E701: this codebase uses one-line `if x: y` guards as a deliberate style
+#       choice in several hot loops (engine, search). Not worth a mass reformat.
+# E402: several entrypoints (tests, backend/ui scripts) insert the project
+#       root onto sys.path before importing local packages; that's required,
+#       not accidental.
+ignore = ["E701", "E402"]

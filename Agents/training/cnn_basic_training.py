@@ -13,8 +13,6 @@ read it — the file exists only to show the registry feature.
 """
 
 import argparse
-import os
-import random as _rnd
 import time
 
 import numpy as np
