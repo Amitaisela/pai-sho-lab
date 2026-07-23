@@ -1,4 +1,5 @@
 import importlib
+import inspect
 import os
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -91,6 +92,14 @@ def validate_registry():
                 else:
                     if not hasattr(mod, attr_name):
                         errors.append(f"{label}: '{module_name}' has no attribute '{attr_name}'")
+                    elif kind == 'class':
+                        cls = getattr(mod, attr_name)
+                        if not hasattr(cls, 'choose_action'):
+                            errors.append(f'{label}: {attr_name} has no choose_action method')
+                        else:
+                            params = list(inspect.signature(cls.choose_action).parameters)
+                            if len(params) < 3 or params[2] != 'verbose':
+                                errors.append(f'{label}: {attr_name}.choose_action must accept (self, game, verbose=False) positionally; got parameters {params[1:]}')
         training_params = a.get('training_params', [])
         if a.get('training_script'):
             script_path = os.path.join(_REPO_ROOT, a['training_script'])

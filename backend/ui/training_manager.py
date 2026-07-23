@@ -226,47 +226,53 @@ def _reader_thread(process, model):
 
 
 def start_training(model, params):
+    # Claim "running" atomically under the lock so two concurrent start
+    # requests can't both pass the guard before either finishes spawning.
     with _lock:
         if _training_state["status"] == "running":
             raise ValueError("Training is already running")
+        _training_state["status"] = "running"
 
-    entry = get_agent(model)
-    if not entry or not entry.get("training_script"):
-        raise ValueError(f"Unknown or non-trainable model: {model}")
+    try:
+        entry = get_agent(model)
+        if not entry or not entry.get("training_script"):
+            raise ValueError(f"Unknown or non-trainable model: {model}")
 
-    python = sys.executable
-    cmd = [python, "-u", entry["training_script"]]
+        python = sys.executable
+        cmd = [python, "-u", entry["training_script"]]
 
-    training_params = entry.get("training_params", [])
+        training_params = entry.get("training_params", [])
 
-    for tp in training_params:
-        param_key, cli_flag = tp["key"], tp["cli_flag"]
-        value = params.get(param_key, tp["default"])
-        if value is None:
-            continue
-        # resume accepts either a bool (on/off) or a path to a checkpoint.
-        if param_key == "resume":
-            if isinstance(value, bool) or (isinstance(value, (int, float)) and value in (0, 1)):
+        for tp in training_params:
+            param_key, cli_flag = tp["key"], tp["cli_flag"]
+            value = params.get(param_key, tp["default"])
+            if value is None:
+                continue
+            if param_key == "resume":
+                # Every training script's --resume is a 0/1 flag: resume from
+                # the checkpoint/weights at the agent's default model_path.
                 cmd += [cli_flag, "1" if value else "0"]
-            elif value:
+            else:
                 cmd += [cli_flag, str(value)]
-        else:
-            cmd += [cli_flag, str(value)]
 
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
 
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=PROJECT_ROOT,
-        bufsize=1,
-        env=env,
-    )
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=PROJECT_ROOT,
+            bufsize=1,
+            env=env,
+        )
+    except Exception:
+        with _lock:
+            _training_state["status"] = "idle"
+        raise
 
     display_cmd = ["python" if i == 0 else
                    (os.path.relpath(a, PROJECT_ROOT) if os.path.isabs(a) and a.startswith(PROJECT_ROOT) else a)

@@ -829,10 +829,12 @@ def api_tests_status():
 
 
 @app.after_request
-def add_cors(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+def add_cache_headers(response):
+    # No cross-origin API access is needed: the UI and the API are served
+    # from the same Flask app/origin. A wildcard CORS header here would only
+    # let any third-party webpage make authenticated-by-network-position
+    # requests (start/stop training, overwrite config) against this server
+    # from a visiting browser - so we deliberately don't set one.
     if request.path.startswith('/static/tiles/'):
         response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
     return response
@@ -842,5 +844,14 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     host = os.environ.get('HOST', '127.0.0.1')
     debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
+    if debug and host not in ('127.0.0.1', 'localhost'):
+        # Werkzeug's interactive debugger is remote code execution if it's
+        # reachable from anywhere but localhost (e.g. the Tailscale-exposed
+        # Docker deployment binds HOST=0.0.0.0). Refuse rather than trust
+        # the env var blindly.
+        print(f"WARNING: FLASK_DEBUG is set but HOST={host!r} is not loopback; "
+              f"refusing to enable the interactive debugger. Set HOST=127.0.0.1 "
+              f"to use debug mode.")
+        debug = False
     print(f"\nSkud Pai Sho running at http://{host}:{port}\n")
     app.run(debug=debug, use_reloader=False, port=port, host=host, threaded=True)

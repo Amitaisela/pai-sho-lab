@@ -129,40 +129,48 @@ def _reader_thread(process):
 def start_simulation(p1_model, p1_params, p2_model, p2_params,
                      n_games, save_results=False, save_games=False,
                      save_period=1, verbose=True, rated=True, max_steps=1000):
+    # Claim "running" atomically under the lock so two concurrent start
+    # requests can't both pass the guard before either finishes spawning.
     with _lock:
         if _state["status"] == "running":
             raise ValueError("Simulation is already running")
+        _state["status"] = "running"
 
-    p1_spec = _build_spec(p1_model, p1_params)
-    p2_spec = _build_spec(p2_model, p2_params)
+    try:
+        p1_spec = _build_spec(p1_model, p1_params)
+        p2_spec = _build_spec(p2_model, p2_params)
 
-    cmd = [
-        sys.executable, "-u", os.path.join(PROJECT_ROOT, "backend", "simulator.py"),
-        "--mode", "local",
-        "--p1", p1_spec,
-        "--p2", p2_spec,
-        "--n", str(int(n_games)),
-        "--save_results", "1" if save_results else "0",
-        "--save_games", "1" if save_games else "0",
-        "--save_period", str(int(save_period)),
-        "--v", "1" if verbose else "0",
-        "--max_steps", str(int(max_steps)),
-    ]
+        cmd = [
+            sys.executable, "-u", os.path.join(PROJECT_ROOT, "backend", "simulator.py"),
+            "--mode", "local",
+            "--p1", p1_spec,
+            "--p2", p2_spec,
+            "--n", str(int(n_games)),
+            "--save_results", "1" if save_results else "0",
+            "--save_games", "1" if save_games else "0",
+            "--save_period", str(int(save_period)),
+            "--v", "1" if verbose else "0",
+            "--max_steps", str(int(max_steps)),
+        ]
 
-    env = os.environ.copy()
-    env["PYTHONIOENCODING"] = "utf-8"
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
 
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=PROJECT_ROOT,
-        bufsize=1,
-        env=env,
-    )
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            cwd=PROJECT_ROOT,
+            bufsize=1,
+            env=env,
+        )
+    except Exception:
+        with _lock:
+            _state["status"] = "idle"
+        raise
 
     display_cmd = ["python" if i == 0 else
                    (os.path.relpath(a, PROJECT_ROOT) if os.path.isabs(a) and a.startswith(PROJECT_ROOT) else a)
