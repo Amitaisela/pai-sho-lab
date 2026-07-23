@@ -697,7 +697,18 @@
 <script>
     const BOARD_SIZE = 19;
     const API  = '/api';
-    const GID  = 'default';
+    // One id per browser tab (sessionStorage, not shared with other tabs or
+    // windows) so concurrent visitors each get their own game/agent-name/elo
+    // session on the server instead of all silently sharing 'default'.
+    const GID  = (function() {
+      const KEY = 'mushibot_gid';
+      let id = sessionStorage.getItem(KEY);
+      if (!id) {
+        id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        sessionStorage.setItem(KEY, id);
+      }
+      return id;
+    })();
 
     const CELL_MAX = 34;
     const CELL_MIN = 18;
@@ -832,7 +843,7 @@
 
     setInterval(async () => {
       try {
-        const r = await fetch(`${API}/agents`);
+        const r = await fetch(`${API}/agents?gid=${encodeURIComponent(GID)}`);
         const data = await r.json();
         if (data['1'] !== agentNames['1'] || data['2'] !== agentNames['2']) {
           agentNames = data;
@@ -848,7 +859,7 @@
         await new Promise(r => setTimeout(r, 100));
       }
 
-      const r = await post(`${API}/new_game`);
+      const r = await post(`${API}/new_game`, {gid: GID});
       state = r.state;
       cacheStaticData(state);
       selection = null;
@@ -1142,6 +1153,7 @@
     async function syncEloSession() {
       try {
         await post(`${API}/elo/session`, {
+          gid: GID,
           p1_key: document.getElementById('p1-type').value,
           p2_key: document.getElementById('p2-type').value,
           p1_human_name: getHumanName(1),
@@ -1200,6 +1212,7 @@
 
     async function onHandClick(player, flower) {
       if (player !== state.current_player || state.winner) return;
+      if (!isHumanTurn()) return;
       const isAccentOrSpecial = (flower in ACCENT_META) || (flower in SPECIAL_META);
       if (isAccentOrSpecial && !state.bonus_turn) return;
 
@@ -1221,8 +1234,22 @@
       renderAll();
     }
 
+    // While an AI-vs-AI or human-vs-AI autoplay loop is running (see
+    // runBotLoop/startGame), the board used to stay fully clickable during
+    // the bot's turn: only the two agent-type dropdowns were disabled. The
+    // engine only checks that a move's tile belongs to `current_player`, not
+    // who's supposed to be controlling that player, so a stray click in the
+    // ~300ms gap between bot moves could let a human silently play a move on
+    // the bot's behalf. Block board interaction whenever it isn't a human
+    // slot's turn.
+    function isHumanTurn() {
+      if (!gameRunning || !state) return true;
+      return getPlayerConfig(state.current_player).type === 'human';
+    }
+
     async function onTileClick(r, c) {
       if (state.winner) return;
+      if (!isHumanTurn()) return;
       const key  = `${r},${c}`;
       const tile = state.board[key];
 
@@ -1247,6 +1274,7 @@
 
     async function onCellClick(r, c) {
       if (!selection || state.winner) return;
+      if (!isHumanTurn()) return;
 
       if (!validMovesSet.has(`${r},${c}`)) {
         selection  = null;
@@ -1515,6 +1543,7 @@
       const p2Name = getHumanName(2);
       const rated = document.getElementById('rated-toggle').checked;
       await post(`${API}/set_agents`, {
+        gid: GID,
         p1: p1.type === 'human' ? (p1Name || 'Human') : p1.type,
         p2: p2.type === 'human' ? (p2Name || 'Human') : p2.type,
         p1_key: p1.type,
@@ -1596,6 +1625,7 @@
           const r = await post(`${API}/bot_move/${GID}`, { bot: cfg.type, params: cfg.params || {} });
           if (r.error) {
             console.error('Bot error:', r.error);
+            showError(`${cfg.type} failed: ${r.error}`);
             break;
           }
           state = r.state;
@@ -1607,6 +1637,7 @@
           await new Promise(r => setTimeout(r, 300));
         } catch (e) {
           console.error('Bot move failed:', e);
+          showError(`${cfg.type} move failed: ${e.message || e}`);
           break;
         }
       }
@@ -1638,7 +1669,7 @@
         renderAll();
         document.getElementById('win-overlay').classList.remove('show');
         try {
-          const ar = await fetch(`${API}/agents`);
+          const ar = await fetch(`${API}/agents?gid=${encodeURIComponent(GID)}`);
           const ad = await ar.json();
           agentNames = ad;
           applyAgentNames(agentNames);

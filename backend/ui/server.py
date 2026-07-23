@@ -1,9 +1,11 @@
 import os
 import sys
 import json
+import hmac
 import random
 import subprocess
 import threading
+from functools import wraps
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -47,6 +49,28 @@ def _handle_bad_request(e):
 _VALID_SET = set(VALID_SPACES)
 _KNOWN_TILES = set(FLOWER) | set(SPECIAL_TILES) | set(ACCENT_TILES)
 
+_API_TOKEN = os.environ.get('MUSHIBOT_API_TOKEN', '').strip()
+
+
+def _require_api_token(view):
+    """Gate a state-mutating endpoint behind MUSHIBOT_API_TOKEN, if set.
+
+    Training/simulation start-stop and config writes had no access control
+    beyond network position: fine for a laptop, not fine for the Tailscale
+    deployment this app documents, where anyone reachable on the tailnet -
+    not just the intended operator - could stop someone else's training run
+    or overwrite their hyperparameter config. Leaving MUSHIBOT_API_TOKEN
+    unset keeps the previous (open) behavior for local single-user use.
+    """
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if _API_TOKEN:
+            supplied = request.headers.get('X-API-Token', '')
+            if not hmac.compare_digest(supplied, _API_TOKEN):
+                return jsonify({'error': 'unauthorized'}), 401
+        return view(*args, **kwargs)
+    return wrapped
+
 
 def _json_body(*required):
     d = request.get_json(silent=True)
@@ -75,16 +99,44 @@ def _flower_name(d, key='flower'):
     return f
 
 
+# All per-visitor state below is keyed by `gid` (a client-generated id, one
+# per browser tab; see index.html). Before this, `agent_names`/`elo_session`
+# were single global dicts and `games`/`_bot_agents` used a hardcoded
+# 'default' key everywhere, so two concurrent tabs/visitors silently shared
+# and clobbered one game. Every route that reads/writes this state now takes
+# (or defaults) a `gid`, and callers that predate per-tab ids (e.g.
+# simulator.py's --mode flask) keep working unchanged via the 'default' key.
 games = {}
-agent_names = {'1': None, '2': None}
 
-elo_session = {
-    'p1_key': None,
-    'p2_key': None,
-    'p1_human_name': '',
-    'p2_human_name': '',
-    'rated': True,
-}
+
+def _default_agent_names():
+    return {'1': None, '2': None}
+
+
+_agent_names_by_gid = {}
+
+
+def _get_agent_names(gid):
+    return _agent_names_by_gid.setdefault(gid, _default_agent_names())
+
+
+def _default_elo_session():
+    return {
+        'p1_key': None,
+        'p2_key': None,
+        'p1_human_name': '',
+        'p2_human_name': '',
+        'rated': True,
+    }
+
+
+_elo_sessions_by_gid = {}
+
+
+def _get_elo_session(gid):
+    return _elo_sessions_by_gid.setdefault(gid, _default_elo_session())
+
+
 _recorded_games = set()
 _last_elo_result = {}
 
@@ -134,19 +186,22 @@ def root():
 
 @app.route('/api/new_game', methods=['POST'])
 def api_new_game():
-    games['default'] = PaiShoGame()
-    _history_stacks['default'] = {'undo': [], 'redo': []}
-    _recorded_games.discard('default')
-    _last_elo_result.pop('default', None)
-    return jsonify({'game_id': 'default', 'state': serialize(games['default'])})
+    d = request.get_json(silent=True) or {}
+    gid = d.get('gid') or 'default'
+    games[gid] = PaiShoGame()
+    _history_stacks[gid] = {'undo': [], 'redo': []}
+    _recorded_games.discard(gid)
+    _last_elo_result.pop(gid, None)
+    return jsonify({'game_id': gid, 'state': serialize(games[gid])})
 
 
-def _resolve_agent_key(slot):
-    k = elo_session.get(f'p{slot}_key')
+def _resolve_agent_key(gid, slot):
+    session = _get_elo_session(gid)
+    k = session.get(f'p{slot}_key')
     if not k:
         return None
     if k == 'human':
-        name = elo_session.get(f'p{slot}_human_name', '') or 'Guest'
+        name = session.get(f'p{slot}_human_name', '') or 'Guest'
         return elo.human_key(name)
     return k
 
@@ -156,11 +211,11 @@ def _maybe_record_elo(gid, game):
         return
     if not game.winner:
         return
-    if not elo_session.get('rated', True):
+    if not _get_elo_session(gid).get('rated', True):
         _recorded_games.add(gid)
         return
-    p1_key = _resolve_agent_key('1')
-    p2_key = _resolve_agent_key('2')
+    p1_key = _resolve_agent_key(gid, '1')
+    p2_key = _resolve_agent_key(gid, '2')
     if not p1_key or not p2_key:
         _recorded_games.add(gid)
         return
@@ -305,25 +360,29 @@ def api_set_state(gid):
 
 @app.route('/api/set_agents', methods=['POST'])
 def api_set_agents():
-    global agent_names
     d = request.get_json(silent=True) or {}
-    agent_names = {'1': d.get('p1', 'Player 1'), '2': d.get('p2', 'Player 2')}
+    gid = d.get('gid') or 'default'
+    names = _get_agent_names(gid)
+    names['1'] = d.get('p1', 'Player 1')
+    names['2'] = d.get('p2', 'Player 2')
+    session = _get_elo_session(gid)
     if 'p1_key' in d:
-        elo_session['p1_key'] = d.get('p1_key')
+        session['p1_key'] = d.get('p1_key')
     if 'p2_key' in d:
-        elo_session['p2_key'] = d.get('p2_key')
+        session['p2_key'] = d.get('p2_key')
     if 'rated' in d:
-        elo_session['rated'] = bool(d.get('rated'))
+        session['rated'] = bool(d.get('rated'))
     if 'p1_human_name' in d:
-        elo_session['p1_human_name'] = d.get('p1_human_name', '') or ''
+        session['p1_human_name'] = d.get('p1_human_name', '') or ''
     if 'p2_human_name' in d:
-        elo_session['p2_human_name'] = d.get('p2_human_name', '') or ''
+        session['p2_human_name'] = d.get('p2_human_name', '') or ''
     return jsonify({'status': 'success'})
 
 
 @app.route('/api/agents', methods=['GET'])
 def api_get_agents():
-    return jsonify(agent_names)
+    gid = request.args.get('gid') or 'default'
+    return jsonify(_get_agent_names(gid))
 
 
 @app.route('/leaderboard')
@@ -351,12 +410,17 @@ def api_elo_rating():
 def api_elo_session():
     if request.method == 'POST':
         d = request.json or {}
+        gid = d.get('gid') or 'default'
+        session = _get_elo_session(gid)
         for field in ('p1_key', 'p2_key', 'p1_human_name', 'p2_human_name'):
             if field in d:
-                elo_session[field] = d[field] or ''
+                session[field] = d[field] or ''
         if 'rated' in d:
-            elo_session['rated'] = bool(d['rated'])
-    return jsonify(dict(elo_session))
+            session['rated'] = bool(d['rated'])
+    else:
+        gid = request.args.get('gid') or 'default'
+        session = _get_elo_session(gid)
+    return jsonify(dict(session))
 
 
 @app.route('/api/save/<gid>', methods=['GET'])
@@ -364,8 +428,9 @@ def api_save_game(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    p1 = agent_names.get('1', 'Player 1') or 'Player 1'
-    p2 = agent_names.get('2', 'Player 2') or 'Player 2'
+    names = _get_agent_names(gid)
+    p1 = names.get('1') or 'Player 1'
+    p2 = names.get('2') or 'Player 2'
     save_data = g.to_save_dict(p1_name=p1, p2_name=p2)
     filename = f"{p1}_vs_{p2}.json"
     return Response(
@@ -380,8 +445,9 @@ def api_export_psn(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    p1 = agent_names.get('1', 'Player 1') or 'Player 1'
-    p2 = agent_names.get('2', 'Player 2') or 'Player 2'
+    names = _get_agent_names(gid)
+    p1 = names.get('1') or 'Player 1'
+    p2 = names.get('2') or 'Player 2'
     text = game_to_psn(g, p1_name=p1, p2_name=p2)
     filename = f"{p1}_vs_{p2}.psn"
     return Response(
@@ -407,10 +473,11 @@ def api_import_psn(gid):
         return jsonify({'error': f'parse error: {e}'}), 400
     games[gid] = game
     _history_stacks[gid] = {'undo': [], 'redo': []}
+    names = _get_agent_names(gid)
     if tags.get('Player1'):
-        agent_names['1'] = tags['Player1']
+        names['1'] = tags['Player1']
     if tags.get('Player2'):
-        agent_names['2'] = tags['Player2']
+        names['2'] = tags['Player2']
     return jsonify({'state': serialize(games[gid]), 'tags': tags})
 
 
@@ -421,10 +488,11 @@ def api_load_game(gid):
         return jsonify({'error': 'invalid save file'}), 400
     games[gid] = PaiShoGame.from_save_dict(data)
     _history_stacks[gid] = {'undo': [], 'redo': []}
+    names = _get_agent_names(gid)
     if data.get('p1'):
-        agent_names['1'] = data['p1']
+        names['1'] = data['p1']
     if data.get('p2'):
-        agent_names['2'] = data['p2']
+        names['2'] = data['p2']
     return jsonify({'state': serialize(games[gid])})
 
 
@@ -458,12 +526,18 @@ def api_redo(gid):
                     'can_redo': len(stacks['redo']) > 0})
 
 
-def _get_bot_agent(bot_type, params):
-    key = bot_type.lower()
+def _get_bot_agent(gid, bot_type, params):
+    # Keyed by (gid, bot_type): the cache used to be keyed by bot_type alone,
+    # a global shared across every concurrent tab/game. Since Flask runs
+    # threaded=True, two simultaneous games both using e.g. 'mcts' would
+    # literally share one mutable agent instance (tree/transposition-table
+    # state) with no lock - a data race that could corrupt or leak state
+    # between unrelated games. Scoping by gid gives each tab its own instance.
+    key = (gid, bot_type.lower())
     if key in _bot_agents:
         return _bot_agents[key]
 
-    entry = get_agent(key)
+    entry = get_agent(bot_type.lower())
     if not entry or entry["kind"] != "class":
         return None
 
@@ -476,7 +550,7 @@ def _get_bot_agent(bot_type, params):
     return agent
 
 
-def _bot_choose_action(game, bot_type, params):
+def _bot_choose_action(gid, game, bot_type, params):
     key = bot_type.lower()
     legal_actions = game.get_legal_actions()
     if not legal_actions:
@@ -489,7 +563,7 @@ def _bot_choose_action(game, bot_type, params):
     kind = entry["kind"]
 
     if kind == "class":
-        agent = _get_bot_agent(key, params)
+        agent = _get_bot_agent(gid, key, params)
         if agent is None:
             return random.choice(legal_actions)
         # Every play_param is re-applied each turn, falling back to its own
@@ -517,7 +591,7 @@ def api_bot_move(gid):
     params = d.get('params', {})
 
     _save_snapshot(gid)
-    action = _bot_choose_action(g, bot_type, params)
+    action = _bot_choose_action(gid, g, bot_type, params)
     if action is None:
         return jsonify({'error': 'no legal moves', 'state': serialize(g)}), 400
 
@@ -587,6 +661,7 @@ def download_example(filename):
 
 
 @app.route('/api/training/start', methods=['POST'])
+@_require_api_token
 def api_training_start():
     d = request.json
     model = d.get('model')
@@ -599,6 +674,7 @@ def api_training_start():
 
 
 @app.route('/api/training/stop', methods=['POST'])
+@_require_api_token
 def api_training_stop():
     return jsonify(stop_training())
 
@@ -668,6 +744,7 @@ def api_training_config_read():
 
 
 @app.route('/api/training/config', methods=['POST'])
+@_require_api_token
 def api_training_config_write():
     d = request.json
     model = d.get('model', '')
@@ -710,6 +787,7 @@ def simulate_page():
 
 
 @app.route('/api/simulate/start', methods=['POST'])
+@_require_api_token
 def api_simulate_start():
     d = request.json or {}
     try:
@@ -732,6 +810,7 @@ def api_simulate_start():
 
 
 @app.route('/api/simulate/stop', methods=['POST'])
+@_require_api_token
 def api_simulate_stop():
     return jsonify(stop_simulation())
 
@@ -781,6 +860,7 @@ _test_state = {
 
 
 @app.route('/api/tests/run', methods=['POST'])
+@_require_api_token
 def api_tests_run():
     with _test_state["lock"]:
         if _test_state["status"] == "running":

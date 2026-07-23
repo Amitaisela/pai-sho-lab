@@ -16,6 +16,8 @@ services:
     build: .
     network_mode: service:tailscale
     depends_on: [tailscale]
+    environment:
+      - MUSHIBOT_API_TOKEN=${MUSHIBOT_API_TOKEN:-}
     volumes:
       - ./data:/app/data
     deploy:
