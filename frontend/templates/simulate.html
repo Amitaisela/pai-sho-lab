@@ -263,6 +263,29 @@
 </div>
 
 <script>
+// ── Optional API token (see server.py's _require_api_token / train.html) ──
+// Simulation start-stop has no access control beyond network position, so
+// anyone reachable on the network (e.g. a Tailscale tailnet) can stop
+// someone else's run. A `?api_token=...` query param on first visit saves
+// the operator's MUSHIBOT_API_TOKEN to localStorage so it can be replayed
+// as an X-API-Token header afterward. Unset by default.
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('api_token');
+    if (fromUrl) {
+        localStorage.setItem('mushibot_api_token', fromUrl);
+        params.delete('api_token');
+        const qs = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+    }
+})();
+function authHeaders(extra) {
+    const token = localStorage.getItem('mushibot_api_token');
+    const headers = Object.assign({}, extra || {});
+    if (token) headers['X-API-Token'] = token;
+    return headers;
+}
+
 let AGENTS = [];                  // list of playable agent entries
 let AGENTS_BY_KEY = {};
 let eventSource = null;
@@ -380,7 +403,7 @@ async function startSim() {
     try {
         const res = await fetch('/api/simulate/start', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(body),
         });
         const data = await res.json();
@@ -394,7 +417,7 @@ async function startSim() {
 }
 
 async function stopSim() {
-    try { await fetch('/api/simulate/stop', { method: 'POST' }); } catch (e) {}
+    try { await fetch('/api/simulate/stop', { method: 'POST', headers: authHeaders() }); } catch (e) {}
 }
 
 function connectSSE() {

@@ -228,9 +228,20 @@ def _reader_thread(process, model):
 def start_training(model, params):
     # Claim "running" atomically under the lock so two concurrent start
     # requests can't both pass the guard before either finishes spawning.
+    # Only one training job can run server-wide at a time (see module
+    # docstring-equivalent note below), so a generic "already running" error
+    # left whoever hit the 409 with no way to tell what was occupying the
+    # slot or how long it'd been going - annoying when it's someone else's
+    # job on a shared/tailnet deployment. Report what's running instead.
     with _lock:
         if _training_state["status"] == "running":
-            raise ValueError("Training is already running")
+            running_model = _training_state.get("model") or "unknown model"
+            started = _training_state.get("start_time")
+            elapsed = f"{time.time() - started:.0f}s ago" if started else "unknown time ago"
+            raise ValueError(
+                f"Training is already running ({running_model}, started {elapsed}). "
+                f"Only one training job can run at a time; stop it first."
+            )
         _training_state["status"] = "running"
 
     try:

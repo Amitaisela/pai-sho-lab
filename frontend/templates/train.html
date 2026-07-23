@@ -551,6 +551,31 @@
 </div>
 
 <script>
+// ── Optional API token (see server.py's _require_api_token) ──
+// Training/simulation start-stop and config writes have no access control
+// beyond network position (e.g. a Tailscale tailnet), so anyone reachable on
+// the network can stop someone else's run or overwrite their config. Setting
+// MUSHIBOT_API_TOKEN server-side closes that gap; a `?api_token=...` query
+// param on first visit saves it to localStorage so it can be replayed as an
+// X-API-Token header on every request afterward. Unset by default, matching
+// the server's open-by-default behavior for local single-user use.
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get('api_token');
+    if (fromUrl) {
+        localStorage.setItem('mushibot_api_token', fromUrl);
+        params.delete('api_token');
+        const qs = params.toString();
+        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : ''));
+    }
+})();
+function authHeaders(extra) {
+    const token = localStorage.getItem('mushibot_api_token');
+    const headers = Object.assign({}, extra || {});
+    if (token) headers['X-API-Token'] = token;
+    return headers;
+}
+
 // ── Init data bundled with the HTML response to avoid extra roundtrips. ──
 const INIT_DATA = {{ init_data|tojson }};
 const MODEL_INFO_CACHE = INIT_DATA.model_infos || {};
@@ -724,7 +749,7 @@ async function startTraining() {
     try {
         const res = await fetch('/api/training/start', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({ model: selectedModel, params }),
         });
         const data = await res.json();
@@ -743,7 +768,7 @@ async function startTraining() {
 // ── Stop training ──
 async function stopTraining() {
     try {
-        await fetch('/api/training/stop', { method: 'POST' });
+        await fetch('/api/training/stop', { method: 'POST', headers: authHeaders() });
     } catch (e) {
         // ignore
     }
@@ -988,7 +1013,7 @@ async function saveConfig() {
     try {
         const res = await fetch('/api/training/config', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: authHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({ model: selectedModel, content: textarea.value }),
         });
         const data = await res.json();
@@ -1027,7 +1052,7 @@ async function runTests() {
     label.style.color = 'var(--text-dim)';
 
     try {
-        const res = await fetch('/api/tests/run', { method: 'POST' });
+        const res = await fetch('/api/tests/run', { method: 'POST', headers: authHeaders() });
         if (!res.ok) {
             const d = await res.json();
             console_.textContent = d.error || 'Failed to start tests';

@@ -131,9 +131,20 @@ def start_simulation(p1_model, p1_params, p2_model, p2_params,
                      save_period=1, verbose=True, rated=True, max_steps=1000):
     # Claim "running" atomically under the lock so two concurrent start
     # requests can't both pass the guard before either finishes spawning.
+    # Only one simulation can run server-wide at a time, so a generic
+    # "already running" error left whoever hit the 409 with no way to tell
+    # what was occupying the slot or how long it'd been going - annoying
+    # when it's someone else's job on a shared/tailnet deployment. Report
+    # what's running instead.
     with _lock:
         if _state["status"] == "running":
-            raise ValueError("Simulation is already running")
+            spec = f"{_state.get('p1_spec') or '?'} vs {_state.get('p2_spec') or '?'}"
+            started = _state.get("start_time")
+            elapsed = f"{time.time() - started:.0f}s ago" if started else "unknown time ago"
+            raise ValueError(
+                f"Simulation is already running ({spec}, started {elapsed}). "
+                f"Only one simulation can run at a time; stop it first."
+            )
         _state["status"] = "running"
 
     try:
