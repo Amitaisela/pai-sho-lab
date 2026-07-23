@@ -1,0 +1,320 @@
+Metadata-Version: 2.4
+Name: Pai-Sho-Lab
+Version: 0.1.0
+Summary: A Skud Pai Sho game engine and AI bot framework with a web UI
+Author-email: Amitai Sela <amitaisela@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/Amitaisela/pai-sho-lab
+Project-URL: Repository, https://github.com/Amitaisela/pai-sho-lab
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Games/Entertainment :: Board Games
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Classifier: Framework :: Flask
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: flask>=2.3.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: requests>=2.32
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: torch>=2.1.0
+Dynamic: license-file
+
+# Pai Sho Lab
+
+[![Tests](https://github.com/Amitaisela/pai-sho-lab/actions/workflows/test.yml/badge.svg)](https://github.com/Amitaisela/pai-sho-lab/actions/workflows/test.yml)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+A minimal AI framework for building and training agents that play **Skud Pai Sho** — a two-player strategy board game on a circular 19×19 grid. Write an agent, wire it into the registry, train it from the browser, then pit it against other agents in simulation.
+
+> Based on [Skud Pai Sho](https://skudpaisho.com/).
+
+You start with three agents:
+
+- `random` — picks a random legal move (baseline).
+- `basic_minimax` — depth-limited alpha-beta minimax. Serves as the reference template for adding untrainable agents.
+- `cnn_basic` — a trainable CNN. Serves as the reference template for adding trainable agents.
+
+---
+
+## What is this?
+
+Pai Sho Lab is a local workbench for developing **Skud Pai Sho** AI agents. You write two Python files — an agent class and a training script — then add one entry to the registry describing their hyperparameters. From there the web UI generates a training form from your registry entry, spawns your training script as a subprocess, streams its progress, and makes the trained agent immediately available for simulation and play — no UI code needs to change.
+
+Skud Pai Sho is a two-player game (a bit like chess or Go) played on a round board. Players take turns placing and moving flowers, and the first to surround the center of the board with a closed ring of matching flowers wins.
+
+When you start Pai Sho Lab and open it in your browser, you get:
+
+- **Train** — the main workflow. Pick an agent, fill in hyperparameters, kick off training, and watch live progress and metrics stream in.
+- **Simulate** — run a tournament between two agents to measure how a training run actually moved the needle.
+- **Leaderboard** — Elo ratings accumulated from simulation results, so improvement is legible over time.
+- **Play** — a clickable board for sanity-checking an agent against a human, or spectating agent-vs-agent games.
+
+Out of the box you can train `cnn_basic` and tune `basic_minimax`'s evaluation weights. To build up a roster of smarter agents, see [Adding a new model you can train](#adding-a-new-model-you-can-train) below.
+
+For the architecture behind the registry, the engine internals, and why each agent is built the way it is, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+---
+
+## Where this repo comes from
+
+Pai Sho Lab isn't hand-maintained as a standalone project — it's an **auto-published mirror**. The actual research happens in a private, full-size codebase (`MushiBot`) that carries a much larger agent roster: classical alpha-beta search, MCTS with RAVE, tabular and linear RL (Q-learning, TD(λ)), an NNUE-style quantised value net, PPO with GAE, a Set Transformer policy, and a NEAT-evolved network — plus all of their training scripts, checkpoints, and internal tooling.
+
+On every push to `main` in that private repo, CI runs a distillation script (`scripts/distill.py` — kept private, see step 3 below for why it isn't shipped here) that:
+
+1. Prunes the agent registry down to three agents: `random`, `basic_minimax`, `cnn_basic`.
+2. Deletes every other agent's implementation, training script, and saved weights.
+3. Strips the deploy/distillation machinery itself (`scripts/`, CI secrets, checkpoints) so it can't ship recursively.
+4. Swaps in a test-only CI workflow — the one whose badge is at the top of this README — so this repo can't trigger its own deploy.
+5. Force-pushes the pruned tree here, as a real commit carrying the original commit message plus a `Synced from Amitaisela/MushiBot@<sha>` trailer, so `git log` here still tells you when each change actually landed upstream.
+
+In other words: what you're looking at is a **generated, working subset** of a larger system, republished automatically so it stays trivial to clone, read end to end, and use as a template — without dragging along research code, trained weights, or infrastructure that isn't relevant to someone extending it. Adding an agent here follows exactly the pattern described below; it just won't be one of the ones the private repo keeps to itself.
+
+---
+
+## Setup
+
+**Requirements:** Python 3.11+
+
+```bash
+git clone <url>
+cd pai-sho-lab
+python -m venv venv
+.\venv\Scripts\activate
+pip install -e .
+pip install -r requirements.txt
+```
+
+## Running
+
+```bash
+python backend/ui/server.py
+```
+
+Open http://localhost:5000. Everything — training, simulation, leaderboard, play — is driven from the web UI.
+
+First-time use: open the **Train** page, pick an agent, set hyperparameters, and start a run. When it finishes, head to **Simulate** to benchmark the trained agent against a baseline and watch the Elo update on the **Leaderboard**.
+
+## Running with Docker
+
+```bash
+cp .env.example .env   # fill in TS_AUTHKEY (a Tailscale auth key: https://login.tailscale.com/admin/settings/keys)
+docker compose up
+```
+
+This builds the app image and brings up two containers: `backend` (the Flask app) and `tailscale` (a sidecar that joins your tailnet). The app is reachable at both `http://localhost:5000` on the host and `http://mushibot:5000` from any other device on your tailnet — no port forwarding, nothing publicly exposed. `./data` is mounted into the container, so weights, checkpoints, saved games, and results persist across rebuilds.
+
+GPU access is requested by default (needed for training with `cnn_basic`, `nneu_basic`, `ppo`, `set_transformer`); it requires the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) on the host. On a machine without a GPU, run with the CPU override instead:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml up
+```
+
+## Agents that ship with this template
+
+| Agent | Description |
+|-------|-------------|
+| `random` | Picks a random legal move |
+| `human` | You play via the browser |
+| `basic_minimax` | Alpha-beta minimax with a tunable evaluation vector (reference template) |
+| `cnn_basic` | Pretrained CNN value network with one-ply greedy selection |
+
+### About `cnn_basic`
+
+`cnn_basic` is a two-layer convolutional value network over an 8-channel 19×19 board encoding (piece planes, player-to-move, gate/zone masks). At play time the agent enumerates every legal action, applies it to a cloned game, scores the resulting state with the net, and picks the highest-scoring move — a one-ply greedy search, no lookahead.
+
+The network ships with trained weights at [data/params/CNNBasic/cnn_basic.pt](data/params/CNNBasic/cnn_basic.pt), so it plays competently out of the box. If you want to improve on it, re-train via the Train page or directly:
+
+```bash
+python Agents/training/cnn_basic_training.py --n 200 --lr 1e-3 --eps 0.5 --opponent self
+```
+
+It's a good template for anyone wiring up a small neural-net agent: the training loop, checkpoint format, and registry entry are all minimal and can be copied as-is.
+
+---
+
+## Developers
+
+### Project main files
+
+```
+engine/PythonEngine/PaiShoGame.py — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
+
+Agents/registry.py    — Single source of truth for every agent (UI config, training config, CLI mapping)
+Agents/training/      — One training script per trainable agent
+Agents/utils.py       — Shared helpers + DATA_DIR constant
+Agents/elo.py         — Elo bookkeeping
+Agents/logging_utils.py — logging
+
+data/params/             — Saved weights / checkpoints (.pkl, .pt)
+
+backend/ui/server.py     — Flask app + REST endpoints
+backend/ui/simulate_manager.py — Spawns simulator.py subprocesses for the Simulate page
+backend/ui/training_manager.py — Spawns training scripts, parses their stdout for the Train page
+backend/simulator.py     — Headless game runner (subprocess target)
+
+frontend/templates/      — index, simulate, train, leaderboard, guide, rules
+
+tests/                   — test.py (engine unit tests) + test_integration.py (end-to-end)
+```
+
+### Core conventions
+
+- **Agent interface:** every agent implements `choose_action(game, verbose=False)` → action tuple.
+- **Actions:** `('plant', flower, r, c)` or `('arrange', from_r, from_c, to_r, to_c)`.
+- **Board state:** `dict[(row, col)] -> {'flower': name, 'player': 1|2, 'growing': bool}`.
+- **Always clone before simulating:** `game.clone()` — `PaiShoGame` is mutable.
+
+### The registry
+
+[Agents/registry.py](Agents/registry.py) is the **single source of truth** for every agent. The game UI, Simulate page, Train page, and simulator all read from it. Adding a new agent = adding one entry to `AGENTS`. No UI code needs to change — forms, dropdowns, and CLI wiring are generated from the entry.
+
+---
+
+### Adding a new model you can train
+
+Every piece below wires together through [Agents/registry.py](Agents/registry.py). The cleanest path is to **copy `basic_minimax` and rename** — it intentionally exercises every registry feature ([Agents/classical/basic_minimax.py](Agents/classical/basic_minimax.py)). There is also a walkthrough on the **Guide** page in the UI ([frontend/templates/guide.html](frontend/templates/guide.html)).
+
+Or skip the copy-paste and generate the files + registry entry directly:
+
+```bash
+python scripts/new_agent.py my_agent --template minimax   # non-trainable
+python scripts/new_agent.py my_agent --template cnn        # trainable (stubs a training script too)
+```
+
+#### 1. Write the agent class
+
+Create `Agents/rl/my_agent.py`. It must:
+
+- Define a class with a constructor accepting at minimum `player`, `load=True`, and any play-time knobs you expose.
+- Implement `choose_action(self, game, verbose=False)` returning a valid action tuple.
+- Provide `save(path)` and, if `load=True`, restore weights from `model_path` — silently fall back to random init when the file is absent (first-time training).
+
+```python
+class MyAgent:
+    def __init__(self, player=1, load=True, temperature=0.0):
+        self.player = player
+        self.temperature = temperature
+        self.model = build_model()
+        if load and os.path.exists(MODEL_PATH):
+            self.load(MODEL_PATH)
+
+    def choose_action(self, game, verbose=False):
+        legal = game.get_legal_actions()
+        # score each resulting state with self.model, pick best
+        ...
+
+    def save(self, path): ...
+    def load(self, path): ...
+```
+
+#### 2. Write the training script
+
+Create `Agents/training/my_agent_training.py`, if it's needed. It must:
+
+- Accept its hyperparameters as CLI flags using `argparse` — the names must match each training param's `cli_flag` in your registry entry.
+- Run self-play (or play against a fixed opponent), update the model, and **save checkpoints to `model_path`** periodically and at the end.
+- Log progress with `Agents.logging_utils.get_logger(name)` and `log_event(logger, "episode", episode=i, total=N, ...)` — the Train page reads `EVENT:{...}` lines on stdout to drive its progress bar.
+- Support `--resume` to load the existing checkpoint and continue.
+
+Minimal skeleton:
+
+```python
+import argparse
+from Agents.logging_utils import get_logger, log_event
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--n",       type=int,   default=5000)   # episodes
+    ap.add_argument("--lr",      type=float, default=1e-3)
+    ap.add_argument("--eps",     type=float, default=0.3)
+    ap.add_argument("--resume",  action="store_true")
+    args = ap.parse_args()
+
+    log = get_logger("my_agent")
+    agent = MyAgent(load=args.resume)
+
+    for episode in range(1, args.n + 1):
+        outcome, steps = self_play_one_episode(agent, args)
+        log_event(log, "episode", episode=episode, total=args.n, outcome=outcome, steps=steps)
+        if episode % 500 == 0:
+            agent.save(MODEL_PATH)
+    agent.save(MODEL_PATH)
+
+if __name__ == "__main__":
+    main()
+```
+
+#### 3. Register it
+
+Append one entry to the `AGENTS` list in [Agents/registry.py](Agents/registry.py):
+
+```python
+{
+    "key": "my_agent",
+    "display_name": "My Agent",
+    "description": "One-line summary shown in the UI",
+    "kind": "class",
+    "module": "Agents.rl.my_agent",
+    "class_name": "MyAgent",
+    "play_kwargs": {"player": 1, "load": True},
+    "needs_player": True,
+
+    # Form fields in the game UI, built with the num_param/text_param/checkbox_param
+    # helpers defined at the top of registry.py.
+    "play_params": [
+        num_param("temperature", "Temperature", 0.0, min=0.0, max=5.0, step=0.05,
+                  tooltip="0 = greedy; >0 = softmax sampling"),
+    ],
+
+    # Where checkpoints live. The UI shows "Model trained ✓" if this exists.
+    "model_path": "data/params/MyAgent/model.pt",
+
+    # Training script + the knobs that drive it. `cli_flag` is the CLI flag
+    # the training script's argparse expects for that field — no separate
+    # key-to-flag mapping to keep in sync.
+    "training_script": "Agents/training/my_agent_training.py",
+    "training_params": [
+        num_param("episodes", "Episodes",      5000, step=500,  min=1,               cli_flag="--n"),
+        num_param("lr",       "Learning Rate", 1e-3, step=1e-4, min=1e-5, max=0.1,   cli_flag="--lr"),
+        num_param("epsilon",  "Epsilon",       0.3,  step=0.01, min=0,    max=1,     cli_flag="--eps"),
+        checkbox_param("resume", "Resume", False, cli_flag="--resume"),
+    ],
+
+    # Which form field is "total episodes" (drives the progress bar).
+    "total_episodes_key": "episodes",
+
+    # Name of the stdout line parser in backend/ui/training_manager.py.
+    # Use "basic_minimax" if your log line matches that format, or add a new parser.
+    "log_parser": "basic_minimax",
+
+    # Optional: path to a free-form config file editable from the Train page.
+    "config_file": None,
+},
+```
+
+#### Try it
+
+The full lifecycle for adding an agent:
+
+**write agent → write trainer → add registry entry → train agent → play agent against other agents / humans**
+
+---
+
+## Testing
+
+```bash
+python tests/test_integration.py  # end-to-end coverage
+```
+
+## Author
+
+[Amitaisela](https://github.com/Amitaisela)
