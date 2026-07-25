@@ -8,6 +8,7 @@ use std::collections::{HashMap, VecDeque};
 
 use crate::board::{garden_of, is_valid_space, valid_spaces, Garden, Position, GATES};
 use crate::flower::{is_clash, Color, Flower};
+use crate::moves::Outcome;
 use crate::piece::Piece;
 use crate::player::Player;
 use crate::tile::{AccentTile, SpecialTile, Tile, ORTHOGONAL_OFFSETS};
@@ -17,6 +18,7 @@ pub struct Board {
     pub hands: HashMap<Player, HashMap<Tile, i32>>,
     pub current_player: Player,
     pub bonus_turn: bool,
+    pub winner: Option<Outcome>,
 }
 
 impl Default for Board {
@@ -51,6 +53,7 @@ impl Board {
             hands,
             current_player: Player::One,
             bonus_turn: false,
+            winner: None,
         }
     }
 
@@ -192,7 +195,7 @@ impl Board {
 /// there's nothing to check and this returns `true` — matches Python's
 /// `_clear_line_between`, which only has `if`/`elif` branches for the
 /// aligned cases and otherwise falls through to its final `return True`.
-fn clear_line_between(pieces: &HashMap<Position, Piece>, a: Position, b: Position) -> bool {
+pub(crate) fn clear_line_between(pieces: &HashMap<Position, Piece>, a: Position, b: Position) -> bool {
     if a.row == b.row {
         let (lo, hi) = (a.col.min(b.col), a.col.max(b.col));
         for c in (lo + 1)..hi {
@@ -358,6 +361,11 @@ mod tests {
         assert!(board.pieces.is_empty());
         assert_eq!(board.current_player, Player::One);
         assert!(!board.bonus_turn);
+    }
+
+    #[test]
+    fn new_starts_with_no_winner() {
+        assert_eq!(Board::new().winner, None);
     }
 
     #[test]
