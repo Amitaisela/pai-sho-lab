@@ -609,6 +609,10 @@
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Whether game results count toward ELO ratings">
             <input type="checkbox" id="rated-toggle" checked> Rated
         </label>
+        <select id="engine-select" class="btn" style="font-size:12px;" title="Rules engine backing this game">
+            <option value="python" selected>Engine: Python</option>
+            <option value="rust">Engine: Rust</option>
+        </select>
         <button class="btn btn-accent" id="start-btn" onclick="startGame()">Start Game</button>
         <button class="btn" id="pause-btn" style="display:none" onclick="togglePause()">Pause</button>
         <button class="btn" id="undo-btn" onclick="stepBack()" disabled title="Step Back">◀</button>
@@ -859,7 +863,8 @@
         await new Promise(r => setTimeout(r, 100));
       }
 
-      const r = await post(`${API}/new_game`, {gid: GID});
+      const engine = document.getElementById('engine-select')?.value || 'python';
+      const r = await post(`${API}/new_game`, {gid: GID, engine});
       state = r.state;
       cacheStaticData(state);
       selection = null;

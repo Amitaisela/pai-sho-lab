@@ -1,0 +1,10 @@
+# The Dockerfile builds engine/RustEngine/crates/pybind from source inside the image -
+# a host-built target/ (especially *.whl files for the host's own OS/arch) must never
+# leak into the build context, or `pip install .../target/wheels/*.whl` can pick up a
+# stale, wrong-platform wheel alongside the one just built in-container.
+engine/RustEngine/target/
+**/target/
+
+__pycache__/
+*.pyc
+.git/

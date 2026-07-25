@@ -13,6 +13,11 @@ use crate::piece::Piece;
 use crate::player::Player;
 use crate::tile::{AccentTile, SpecialTile, Tile, ORTHOGONAL_OFFSETS};
 
+/// A full game state: board occupancy, both hands, whose turn it is, and
+/// the outcome once the game ends. `Clone` is load-bearing — search agents
+/// (minimax, MCTS) clone a `Board` before simulating a candidate move,
+/// mirroring `PaiShoGame.clone()`.
+#[derive(Debug, Clone)]
 pub struct Board {
     pub pieces: HashMap<Position, Piece>,
     pub hands: HashMap<Player, HashMap<Tile, i32>>,
@@ -55,6 +60,12 @@ impl Board {
             bonus_turn: false,
             winner: None,
         }
+    }
+
+    /// Resets `self` to a fresh starting board in place. Ported from
+    /// `PaiShoGame.reset`.
+    pub fn reset(&mut self) {
+        *self = Board::new();
     }
 
     /// All cells the piece at `from` could move to, given only its move
@@ -285,8 +296,16 @@ impl Board {
     /// accent or special tile (Boat targets an enemy-occupied cell instead
     /// of an empty one); and arranging any owned non-accent tile (skipping
     /// still-growing ones during a bonus turn) to any of its
-    /// `valid_destinations`. Ported from `PaiShoGame.get_legal_actions`.
+    /// `valid_destinations`. Empty once the game has a winner. Ported from
+    /// `PaiShoGame.get_legal_actions` — Milestone 4 deliberately omitted the
+    /// `if self.winner is not None: return []` guard because `Board` had no
+    /// `winner` field yet at the time; Milestone 5 added the field, and this
+    /// wires the guard back in.
     pub fn legal_actions(&self) -> Vec<Action> {
+        if self.winner.is_some() {
+            return Vec::new();
+        }
+
         let player = self.current_player;
         let mut actions = Vec::new();
 
@@ -697,6 +716,17 @@ mod tests {
         board.pieces.insert(Position::new(9, 10), piece(Tile::Flower(Flower::Jasmine), Player::Two));
         board.pieces.insert(Position::new(15, 10), piece(Tile::Flower(Flower::Jasmine), Player::Two));
         assert!(!board.valid_destinations(Position::new(9, 9)).contains(&Position::new(9, 10)));
+    }
+
+    #[test]
+    fn legal_actions_is_empty_once_the_game_has_a_winner() {
+        // Found via cross-engine fuzzing against the Python reference (running many random
+        // self-play games through both engines in lockstep): a board with pieces and gates
+        // that would otherwise produce legal actions, but winner is Some, must report none.
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(9, 9), piece(Tile::Flower(Flower::Rose), Player::One));
+        board.winner = Some(crate::moves::Outcome::Winner(Player::One));
+        assert_eq!(board.legal_actions(), Vec::new());
     }
 
     #[test]

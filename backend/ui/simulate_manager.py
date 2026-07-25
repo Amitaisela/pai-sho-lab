@@ -128,7 +128,8 @@ def _reader_thread(process):
 
 def start_simulation(p1_model, p1_params, p2_model, p2_params,
                      n_games, save_results=False, save_games=False,
-                     save_period=1, verbose=True, rated=True, max_steps=1000):
+                     save_period=1, verbose=True, rated=True, max_steps=1000,
+                     engine='python'):
     # Claim "running" atomically under the lock so two concurrent start
     # requests can't both pass the guard before either finishes spawning.
     # Only one simulation can run server-wide at a time, so a generic
@@ -162,6 +163,7 @@ def start_simulation(p1_model, p1_params, p2_model, p2_params,
             "--save_period", str(int(save_period)),
             "--v", "1" if verbose else "0",
             "--max_steps", str(int(max_steps)),
+            "--engine", engine,
         ]
 
         env = os.environ.copy()

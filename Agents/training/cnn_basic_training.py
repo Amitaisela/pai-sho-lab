@@ -13,6 +13,8 @@ read it — the file exists only to show the registry feature.
 """
 
 import argparse
+import os
+import sys
 import time
 
 import numpy as np
@@ -21,10 +23,15 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
+# engine_select.py is a loose module directly under engine/, not a package matched by
+# pyproject.toml's [tool.setuptools.packages.find] include patterns.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'engine'))
+
 from PythonEngine.PaiShoGame import PaiShoGame
 from Agents.rl.cnn_basic import CNNBasicAgent, encode_board, MODEL_PATH
 from Agents.logging_utils import get_logger, log_event
 from Agents.training.opponent_utils import load_opponent
+from engine_select import DEFAULT_ENGINE, game_class
 
 
 def _reward_from_player_view(winner, player):
@@ -187,11 +194,15 @@ def parse_params():
     parser.add_argument("--opponent", type=str, default="self",
                         help="Training opponent: 'self', 'random', or any registry key")
     parser.add_argument("--device", type=str, default="cpu", help="cpu or cuda")
+    parser.add_argument("--engine", type=str, choices=['python', 'rust'], default=DEFAULT_ENGINE,
+                        help="Rules engine for self-play games. 'rust' requires crates/pybind "
+                             "to be built - see engine/engine_select.py.")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_params()
+    PaiShoGame = game_class(args.engine)
     train_cnn(
         episodes=args.n,
         lr=args.lr,
