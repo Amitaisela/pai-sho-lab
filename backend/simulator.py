@@ -1,14 +1,21 @@
 import requests
+import sys
 import time
 import os
 import json
 import argparse
 from tqdm import tqdm
-from PythonEngine.PaiShoGame import PaiShoGame
+
+# engine_select.py is a loose module directly under engine/, not a package matched by
+# pyproject.toml's [tool.setuptools.packages.find] include patterns - see server.py's
+# identical comment on this.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'engine'))
+
 from PythonEngine.notation import game_to_psn
 from Agents.registry import get_agent
 from Agents.agent_loader import instantiate, act
 from Agents.logging_utils import get_logger, log_event
+from engine_select import DEFAULT_ENGINE, game_class
 
 SERVER_URL = "http://127.0.0.1:5000"
 GAME_ID = "default"
@@ -208,7 +215,7 @@ def print_report(results, p1_spec, p2_spec, total_time):
 
 
 def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
-              save_games=False, save_period=1, max_steps=1000):
+              save_games=False, save_period=1, max_steps=1000, engine=DEFAULT_ENGINE):
     p1_name, p1_params = parse_model_spec(p1_spec)
     p2_name, p2_params = parse_model_spec(p2_spec)
 
@@ -229,7 +236,7 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
         turn_count = 0
         last_player_turn = None
 
-        requests.post(f"{SERVER_URL}/api/new_game")
+        requests.post(f"{SERVER_URL}/api/new_game", json={"engine": engine})
         log.info(f"\n=== Starting Game {i + 1}/{iterations} ===")
 
         while True:
@@ -263,7 +270,9 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
             elif state.get('bonus_turn') and verbose:
                 log.info(f"  Bonus turn for Player {current_p}!")
 
-            local_game = PaiShoGame.from_dict(state)
+            # state['engine'] reflects whatever the server actually used for /api/new_game,
+            # which is authoritative over the `engine` this call was started with.
+            local_game = game_class(state.get('engine', engine)).from_dict(state)
             legal_actions = local_game.get_legal_actions()
 
             if not legal_actions:
@@ -324,9 +333,9 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
 
 
 def play_single_local_game(game_id, p1_name, p2_name, p1_params, p2_params,
-                           agent_p1, agent_p2, verbose=True, max_steps=1000):
+                           agent_p1, agent_p2, verbose=True, max_steps=1000, engine=DEFAULT_ENGINE):
     start_time = time.time()
-    game = PaiShoGame()
+    game = game_class(engine)()
     turn_count = 0
     if verbose:
         log.info(f"Game {game_id} started...")
@@ -356,7 +365,7 @@ def play_single_local_game(game_id, p1_name, p2_name, p1_params, p2_params,
 
 
 def run_local(iterations, p1_spec, p2_spec, save, verbose=True, save_games=False, save_period=1, save_psn=False,
-              max_steps=1000):
+              max_steps=1000, engine=DEFAULT_ENGINE):
     p1_name, p1_params = parse_model_spec(p1_spec)
     p2_name, p2_params = parse_model_spec(p2_spec)
 
@@ -376,7 +385,7 @@ def run_local(iterations, p1_spec, p2_spec, save, verbose=True, save_games=False
             p1_name=p1_name, p2_name=p2_name,
             p1_params=p1_params, p2_params=p2_params,
             agent_p1=agent_p1, agent_p2=agent_p2,
-            verbose=verbose, max_steps=max_steps,
+            verbose=verbose, max_steps=max_steps, engine=engine,
         )
         log.info(f"\n{'=' * 30}\nGAME {game_id} OVER\n{'=' * 30}")
         if winner:
@@ -431,6 +440,10 @@ def parse_params():
                         help="Delay in seconds between AI moves (Flask mode only)")
     parser.add_argument("--max_steps", type=int, default=1000,
                         help="Maximum number of steps per game before declaring a stalemate")
+    parser.add_argument("--engine", type=str, choices=['python', 'rust'], default=DEFAULT_ENGINE,
+                        help="Rules engine to play against (local mode) or request from the server "
+                             "(flask mode). 'rust' requires crates/pybind to be built - see "
+                             "engine/engine_select.py.")
     return parser.parse_args()
 
 
@@ -439,8 +452,8 @@ if __name__ == "__main__":
     if args.mode == 'flask':
         run_flask(args.n, args.p1, args.p2, bool(args.save_results), args.delay,
                   verbose=bool(args.v), save_games=bool(args.save_games),
-                  save_period=args.save_period, max_steps=args.max_steps)
+                  save_period=args.save_period, max_steps=args.max_steps, engine=args.engine)
     elif args.mode == 'local':
         run_local(args.n, args.p1, args.p2, bool(args.save_results), verbose=bool(args.v),
                   save_games=bool(args.save_games), save_period=args.save_period,
-                  save_psn=bool(args.save_psn), max_steps=args.max_steps)
+                  save_psn=bool(args.save_psn), max_steps=args.max_steps, engine=args.engine)

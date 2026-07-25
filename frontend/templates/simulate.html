@@ -201,6 +201,13 @@
             <div class="section-title">Simulation Settings</div>
             <div class="param-group">
                 <div class="param-row">
+                    <label class="param-label" for="engine-select" title="Rules engine to play games against">Engine</label>
+                    <select class="param-input" id="engine-select">
+                        <option value="python" selected>Python</option>
+                        <option value="rust">Rust</option>
+                    </select>
+                </div>
+                <div class="param-row">
                     <label class="param-label" for="n-games" title="Number of games to play">Episodes</label>
                     <input type="number" class="param-input" id="n-games" value="10" min="1" step="1">
                 </div>
@@ -398,6 +405,7 @@ async function startSim() {
         save_period: parseInt(document.getElementById('save-period').value) || 1,
         verbose: document.getElementById('verbose').checked,
         rated: document.getElementById('rated').checked,
+        engine: document.getElementById('engine-select').value,
     };
 
     try {

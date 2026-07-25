@@ -8,6 +8,11 @@ import threading
 from functools import wraps
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
+# engine_select.py is a loose module directly under engine/, not a package matched by
+# pyproject.toml's [tool.setuptools.packages.find] include patterns, so the editable
+# install's finder doesn't expose it the way it does PythonEngine/Agents/ui - add its
+# directory explicitly, same as every other cross-directory import in this file.
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'engine'))
 
 from flask import Flask, jsonify, request, send_from_directory, Response, render_template
 from ui.training_manager import (
@@ -24,6 +29,7 @@ from ui.simulate_manager import (
 from PythonEngine.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CIRCLE,
                               ACCENT_TILES, SPECIAL_TILES, garden_of)
 from PythonEngine.notation import game_to_psn, psn_to_game
+from engine_select import DEFAULT_ENGINE, engine_name_of, game_class
 from Agents.registry import get_agent, playable_agents, trainable_agents
 from Agents.agent_loader import instantiate, act
 from Agents import elo
@@ -160,6 +166,7 @@ def serialize(game: PaiShoGame) -> dict:
     h1 = game.find_harmonies(1)
     h2 = game.find_harmonies(2)
     return {
+        'engine': engine_name_of(game),
         'board': board_s,
         'hands': {'1': game.hands[1], '2': game.hands[2]},
         'current_player': game.current_player,
@@ -188,7 +195,10 @@ def root():
 def api_new_game():
     d = request.get_json(silent=True) or {}
     gid = d.get('gid') or 'default'
-    games[gid] = PaiShoGame()
+    try:
+        games[gid] = game_class(d.get('engine', DEFAULT_ENGINE))()
+    except (ValueError, ImportError) as e:
+        return jsonify({'error': str(e)}), 400
     _history_stacks[gid] = {'undo': [], 'redo': []}
     _recorded_games.discard(gid)
     _last_elo_result.pop(gid, None)
@@ -352,8 +362,8 @@ def api_valid_plant_moves(gid):
 def api_set_state(gid):
     d = _json_body('board', 'hands', 'current_player')
     try:
-        games[gid] = PaiShoGame.from_dict(d)
-    except (KeyError, TypeError, ValueError) as e:
+        games[gid] = game_class(d.get('engine', DEFAULT_ENGINE)).from_dict(d)
+    except (KeyError, TypeError, ValueError, ImportError) as e:
         return jsonify({'error': f'invalid state: {e}'}), 400
     return jsonify({'status': 'success'})
 
@@ -432,6 +442,7 @@ def api_save_game(gid):
     p1 = names.get('1') or 'Player 1'
     p2 = names.get('2') or 'Player 2'
     save_data = g.to_save_dict(p1_name=p1, p2_name=p2)
+    save_data['engine'] = engine_name_of(g)
     filename = f"{p1}_vs_{p2}.json"
     return Response(
         json.dumps(save_data, indent=2),
@@ -460,15 +471,19 @@ def api_export_psn(gid):
 @app.route('/api/import_psn/<gid>', methods=['POST'])
 def api_import_psn(gid):
     text = None
+    requested_engine = DEFAULT_ENGINE
     if request.is_json:
         data = request.get_json(silent=True) or {}
         text = data.get('psn')
+        requested_engine = data.get('engine', DEFAULT_ENGINE)
     if text is None:
         text = request.get_data(as_text=True)
     if not text or not text.strip():
         return jsonify({'error': 'empty PSN'}), 400
     try:
-        game, tags = psn_to_game(text, PaiShoGame)
+        game, tags = psn_to_game(text, game_class(requested_engine))
+    except ImportError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'parse error: {e}'}), 400
     games[gid] = game
@@ -486,7 +501,10 @@ def api_load_game(gid):
     data = request.json
     if not data or 'state' not in data:
         return jsonify({'error': 'invalid save file'}), 400
-    games[gid] = PaiShoGame.from_save_dict(data)
+    try:
+        games[gid] = game_class(data.get('engine', DEFAULT_ENGINE)).from_save_dict(data)
+    except (KeyError, TypeError, ValueError, ImportError) as e:
+        return jsonify({'error': f'invalid save file: {e}'}), 400
     _history_stacks[gid] = {'undo': [], 'redo': []}
     names = _get_agent_names(gid)
     if data.get('p1'):
@@ -803,6 +821,7 @@ def api_simulate_start():
             verbose=bool(d.get('verbose', True)),
             rated=bool(d.get('rated', True)),
             max_steps=int(d.get('max_steps', 1000) or 1000),
+            engine=d.get('engine', DEFAULT_ENGINE),
         )
         return jsonify(status)
     except ValueError as e:

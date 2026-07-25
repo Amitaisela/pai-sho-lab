@@ -673,6 +673,15 @@ function renderParams() {
                 <label class="param-label" for="param-${p.key}" title="${p.tooltip}">${p.label}</label>
             </div>`;
         }
+        if (p.type === 'select') {
+            const options = (p.choices || []).map(c =>
+                `<option value="${c.value}" ${c.value === p.default ? 'selected' : ''}>${c.label}</option>`
+            ).join('');
+            return `<div class="param-row">
+                <label class="param-label" for="param-${p.key}" title="${p.tooltip}">${p.label}</label>
+                <select id="param-${p.key}" class="param-input" title="${p.tooltip}">${options}</select>
+            </div>`;
+        }
         const attrs = [
             `type="${p.type}"`,
             `id="param-${p.key}"`,

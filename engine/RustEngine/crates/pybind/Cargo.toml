@@ -1,0 +1,15 @@
+[package]
+name = "pai_sho_pybind"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pai_sho_engine_rust"
+crate-type = ["cdylib"]
+
+[dependencies]
+pai_sho_engine = { path = "../engine" }
+
+[dependencies.pyo3]
+version = "0.23"
+features = ["extension-module"]

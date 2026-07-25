@@ -44,6 +44,28 @@ jobs:
       - name: Run tests
         run: python tests/basic_tests.py
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Rust engine tests
+        run: cd engine/RustEngine && cargo test --workspace
+
+      - name: Build and install the Rust engine's Python bridge
+        run: |
+          pip install maturin
+          cd engine/RustEngine/crates/pybind
+          maturin build --release
+          pip install ../../target/wheels/*.whl
+
+      - name: Smoke-test the Rust engine bridge
+        run: |
+          python -c "
+          from RustEngine import PaiShoGame
+          g = PaiShoGame()
+          assert g.get_legal_actions(), 'expected legal actions on the opening position'
+          print('RustEngine.PaiShoGame import + basic use OK')
+          "
+
   test-docker:
     runs-on: ubuntu-latest
     steps:
