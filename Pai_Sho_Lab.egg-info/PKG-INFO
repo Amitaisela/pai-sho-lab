@@ -93,6 +93,16 @@ pip install -e .
 pip install -r requirements.txt
 ```
 
+Two rules engines ship side by side: the default pure-Python one, and a Rust implementation under `engine/RustEngine/` exposed to Python via a PyO3 bridge. The Python engine needs nothing extra; the Rust one is optional and requires a [Rust toolchain](https://rustup.rs/):
+
+```bash
+cd engine/RustEngine/crates/pybind
+maturin build --release
+pip install ../../target/wheels/*.whl
+```
+
+Every page (Play/Simulate/Train) and `backend/simulator.py` (`--engine {python,rust}`) has an engine picker, defaulting to Python; picking Rust without having built it raises a clear error telling you how to build it.
+
 ## Running
 
 ```bash
@@ -147,6 +157,8 @@ It's a good template for anyone wiring up a small neural-net agent: the training
 
 ```
 engine/PythonEngine/PaiShoGame.py — Core rules engine (state, legal moves, harmony/clash/ring detection, clone())
+engine/RustEngine/                — Optional Rust engine (PyO3 bridge via maturin), a drop-in for PaiShoGame
+engine/engine_select.py           — Resolves "python"|"rust" to the matching engine class
 
 Agents/registry.py    — Single source of truth for every agent (UI config, training config, CLI mapping)
 Agents/training/      — One training script per trainable agent

@@ -4,6 +4,12 @@
 //! §4), so existing agent code can use it as a duck-typed drop-in
 //! replacement. This is the only crate in the workspace that knows about
 //! Python — `crates/engine` stays a pure, dependency-free rules crate.
+//!
+//! `current_state_web()` is intentionally not ported: it's a manual dev
+//! helper that POSTs to a locally-running Flask server for debugging, has
+//! no callers anywhere in the codebase (agents, server.py, simulator.py,
+//! tests), and pulls in an HTTP client purely for that. Add it here only if
+//! something starts actually calling it on a Rust-backed game.
 
 mod convert;
 mod message;
