@@ -61,7 +61,7 @@ fn initial_hands_match_python_oracle() {
     for player in [Player::One, Player::Two] {
         let hand = &board.hands[&player];
         for f in Flower::ALL {
-            assert_eq!(hand[&Tile::Flower(f)], 2);
+            assert_eq!(hand[&Tile::Flower(f)], 3);
         }
     }
 }
@@ -89,7 +89,7 @@ fn clone_is_independent() {
 #[test]
 fn reset_returns_a_mutated_board_to_the_fresh_state() {
     let mut board = Board::new();
-    board.step(Action::Plant { tile: Tile::Flower(Flower::Rose), at: GATES[0] }).unwrap();
+    board.step(Action::Plant { tile: Tile::Flower(Flower::Rose), at: GATES[0], displace: None }).unwrap();
     assert!(!board.pieces.is_empty());
 
     board.reset();
@@ -98,13 +98,13 @@ fn reset_returns_a_mutated_board_to_the_fresh_state() {
     assert_eq!(board.current_player, Player::One);
     assert_eq!(board.winner, None);
     assert!(!board.bonus_turn);
-    assert_eq!(board.hands[&Player::One][&Tile::Flower(Flower::Rose)], 2);
+    assert_eq!(board.hands[&Player::One][&Tile::Flower(Flower::Rose)], 3);
 }
 
 #[test]
 fn plant_at_gate_sets_growing() {
     let mut board = Board::new();
-    board.step(Action::Plant { tile: Tile::Flower(Flower::Rose), at: GATES[0] }).unwrap();
+    board.step(Action::Plant { tile: Tile::Flower(Flower::Rose), at: GATES[0], displace: None }).unwrap();
     assert!(board.pieces[&GATES[0]].growing);
 }
 
@@ -240,17 +240,18 @@ fn wheel_rotation_correctly_cancels_when_the_rotating_piece_was_itself_the_block
     // (11,13) to (11,12), vacating column 13 between rows 1 and 13 and exposing a genuine
     // Jasmine/Rose clash. The rotation must therefore be cancelled entirely (Rock stays put).
     //
-    // The live Python reference (`PaiShoGame.plant('Wheel', 10, 12)`) gets this wrong and
-    // performs the rotation anyway — not a parity target here, but a second, independently
-    // confirmed manifestation of the same latent bug identified in Milestone 5 Task 7:
-    // `PaiShoGame._clear_line_between` always checks `self.board` (the live, pre-rotation
-    // board) instead of the `custom_board` its caller `find_clashes(custom_board=...)` is
-    // given. At the moment `_apply_wheel` calls `self.find_clashes(custom_board=new_board)`,
-    // Rock is *still* at its pre-rotation (11,13) on the live board, so the buggy line-of-sight
-    // check sees Rock blocking column 13 and misses the clash the true post-rotation board
-    // (`new_board`) actually has — confirmed directly against the live oracle: bypassing the
-    // bug by evaluating `find_clashes` against the real post-rotation board as `self.board`
-    // finds `[((13, 13), (1, 13))]`; the buggy `custom_board=` call path finds `[]`.
+    // The live Python reference (`PaiShoGame.plant('Wheel', 10, 12)`) at the time this test was
+    // written got this wrong and performed the rotation anyway — a latent bug in
+    // `PaiShoGame._clear_line_between` (always checking the live board, not the `custom_board`
+    // its caller `find_clashes(custom_board=...)` was given) fixed since. This port's
+    // `find_clashes_on` (Task 1) was always a pure function of whichever board it's handed, so
+    // it always saw the clash correctly.
+    //
+    // Task 7 update: a Wheel may never be placed next to a Rock at all (official rule), and
+    // Rock@(11,13) sits directly in this Wheel's ring — so `wheel_rotation`/`_wheel_rotation`
+    // now returns `None` for (10,12) outright (independent of the clash below), making the
+    // whole placement illegal rather than a legal-but-silently-cancelled rotation: nothing
+    // about the board may change, Wheel included.
     use pai_sho_engine::piece::Piece;
     use pai_sho_engine::tile::AccentTile;
 
@@ -263,8 +264,10 @@ fn wheel_rotation_correctly_cancels_when_the_rotating_piece_was_itself_the_block
     insert(1, 13, Tile::Flower(Flower::Rose), Player::Two, false);
     board.current_player = Player::One;
 
-    board.plant(Tile::Accent(AccentTile::Wheel), Position::new(10, 12), None).unwrap();
+    let result = board.plant(Tile::Accent(AccentTile::Wheel), Position::new(10, 12), None);
+    assert_eq!(result, Err(pai_sho_engine::moves::MoveError::IllegalAction));
 
     let rock_position = board.pieces.iter().find(|(_, p)| p.tile == Tile::Accent(AccentTile::Rock)).map(|(&pos, _)| pos);
-    assert_eq!(rock_position, Some(Position::new(11, 13)), "the rotation must be cancelled — Rock stays put");
+    assert_eq!(rock_position, Some(Position::new(11, 13)), "the placement must be rejected — Rock stays put");
+    assert!(!board.pieces.contains_key(&Position::new(10, 12)), "the Wheel itself must not be placed either");
 }

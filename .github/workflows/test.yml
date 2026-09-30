@@ -65,6 +65,12 @@ jobs:
           assert g.get_legal_actions(), 'expected legal actions on the opening position'
           print('RustEngine.PaiShoGame import + basic use OK')
           "
+      - name: Rules contract (Python and Rust engines)
+        run: python tests/test_rules_contract.py
+      - name: PSN v2 round-trip
+        run: python tests/test_notation.py
+      - name: Python/Rust parity fuzz
+        run: python tests/parity_fuzz.py --games 300 --seed 1
 
   test-docker:
     runs-on: ubuntu-latest

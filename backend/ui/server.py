@@ -27,7 +27,7 @@ from ui.simulate_manager import (
     wait_for_change as simulate_wait_for_change,
 )
 from PythonEngine.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FLOWER, CIRCLE,
-                              ACCENT_TILES, SPECIAL_TILES, garden_of)
+                              ACCENT_TILES, SPECIAL_TILES)
 from PythonEngine.notation import game_to_psn, psn_to_game
 from engine_select import DEFAULT_ENGINE, engine_name_of, game_class
 from Agents.registry import get_agent, playable_agents, trainable_agents
@@ -86,6 +86,28 @@ def _json_body(*required):
         if k not in d:
             raise _BadRequest(f"missing field: {k}")
     return d
+
+
+def _optional_json_body():
+    """Like _json_body() but a missing/non-JSON body is treated as {} instead
+    of a 400 - for endpoints that have historically accepted a bodiless POST
+    (all fields optional/defaulted). A body that *was* sent but isn't a JSON
+    object is still rejected with 400, instead of reaching `.get()` on
+    something that isn't a dict and 500ing.
+    """
+    d = request.get_json(silent=True)
+    if d is None:
+        return {}
+    if not isinstance(d, dict):
+        raise _BadRequest("request body must be a JSON object")
+    return d
+
+
+def _require_int(value, name):
+    """Reject anything but a real int (bools, floats, numeric strings included)."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise _BadRequest(f"{name} must be an integer")
+    return value
 
 
 def _coord(d, r_key, c_key):
@@ -149,14 +171,10 @@ _last_elo_result = {}
 _history_stacks = {}
 
 
-def _save_snapshot(gid):
-    g = games.get(gid)
-    if not g:
-        return
-    if gid not in _history_stacks:
-        _history_stacks[gid] = {'undo': [], 'redo': []}
-    _history_stacks[gid]['undo'].append(g.clone())
-    _history_stacks[gid]['redo'].clear()
+def _push_snapshot(gid, snapshot):
+    stacks = _history_stacks.setdefault(gid, {'undo': [], 'redo': []})
+    stacks['undo'].append(snapshot)
+    stacks['redo'].clear()
 
 _bot_agents = {}
 
@@ -183,6 +201,11 @@ def serialize(game: PaiShoGame) -> dict:
             '2': [list(map(list, pair)) for pair in h2],
         },
         'history': game.history,
+        'history_players': list(getattr(game, 'history_players', [])),
+        'setup': {'accents': {str(p): list(v) for p, v in game.setup['accents'].items()},
+                  'opening': game.setup['opening']},
+        'end_reason': game.end_reason,
+        'can_skip_bonus': ('skip_bonus',) in {tuple(a) for a in game.get_legal_actions()},
     }
 
 
@@ -193,11 +216,16 @@ def root():
 
 @app.route('/api/new_game', methods=['POST'])
 def api_new_game():
-    d = request.get_json(silent=True) or {}
+    d = _optional_json_body()
     gid = d.get('gid') or 'default'
     try:
-        games[gid] = game_class(d.get('engine', DEFAULT_ENGINE))()
-    except (ValueError, ImportError) as e:
+        setup = {}
+        if d.get('accents') is not None:
+            setup['accents'] = {int(k): v for k, v in d['accents'].items()}
+        if 'opening' in d:
+            setup['opening'] = d['opening']
+        games[gid] = game_class(d.get('engine', DEFAULT_ENGINE))(**setup)
+    except (ValueError, ImportError, TypeError, AttributeError) as e:
         return jsonify({'error': str(e)}), 400
     _history_stacks[gid] = {'undo': [], 'redo': []}
     _recorded_games.discard(gid)
@@ -219,7 +247,7 @@ def _resolve_agent_key(gid, slot):
 def _maybe_record_elo(gid, game):
     if gid in _recorded_games:
         return
-    if not game.winner:
+    if game.winner is None:
         return
     if not _get_elo_session(gid).get('rated', True):
         _recorded_games.add(gid)
@@ -256,7 +284,7 @@ def api_plant(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    if g.winner:
+    if g.winner is not None:
         return jsonify({'error': 'game over'}), 400
 
     d = _json_body('flower', 'row', 'col')
@@ -267,11 +295,12 @@ def api_plant(gid):
         dr, dc = _coord(d, 'displace_row', 'displace_col')
         kwargs['displace_r'] = dr
         kwargs['displace_c'] = dc
-    _save_snapshot(gid)
+    snap = g.clone()
     try:
         g.plant(flower, r, c, **kwargs)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+    _push_snapshot(gid, snap)
 
     return jsonify({'state': serialize(g)})
 
@@ -281,18 +310,51 @@ def api_arrange(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    if g.winner:
+    if g.winner is not None:
         return jsonify({'error': 'game over'}), 400
 
     d = _json_body('from_row', 'from_col', 'to_row', 'to_col')
     fr, fc = _coord(d, 'from_row', 'from_col')
     tr, tc = _coord(d, 'to_row', 'to_col')
-    _save_snapshot(gid)
+    snap = g.clone()
     try:
         g.arrange(fr, fc, tr, tc)
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+    _push_snapshot(gid, snap)
 
+    return jsonify({'state': serialize(g)})
+
+
+@app.route('/api/skip_bonus/<gid>', methods=['POST'])
+def api_skip_bonus(gid):
+    g = games.get(gid)
+    if not g:
+        return jsonify({'error': 'not found'}), 404
+    if g.winner is not None:
+        return jsonify({'error': 'game over'}), 400
+    snap = g.clone()
+    try:
+        g.step(('skip_bonus',))
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    _push_snapshot(gid, snap)
+    return jsonify({'state': serialize(g)})
+
+
+@app.route('/api/resign/<gid>', methods=['POST'])
+def api_resign(gid):
+    g = games.get(gid)
+    if not g:
+        return jsonify({'error': 'not found'}), 404
+    d = _optional_json_body()
+    player = _require_int(d.get('player', g.current_player), 'player')
+    snap = g.clone()
+    try:
+        g.resign(player)
+    except (TypeError, ValueError) as e:
+        return jsonify({'error': str(e)}), 400
+    _push_snapshot(gid, snap)
     return jsonify({'state': serialize(g)})
 
 
@@ -303,7 +365,14 @@ def api_valid_moves(gid):
         return jsonify({'error': 'not found'}), 404
     d = _json_body('row', 'col')
     r, c = _coord(d, 'row', 'col')
-    moves = g.valid_destinations(r, c)
+    # Derived from get_legal_actions() rather than valid_destinations(), which
+    # ignores the pending bonus (and other legality gates) and would otherwise
+    # surface illegal 'arrange' hints on bonus turns.
+    seen, moves = set(), []
+    for a in g.get_legal_actions():
+        if a[0] == 'arrange' and (a[1], a[2]) == (r, c) and (a[3], a[4]) not in seen:
+            seen.add((a[3], a[4]))
+            moves.append([a[3], a[4]])
     return jsonify({'moves': moves})
 
 
@@ -314,26 +383,10 @@ def api_valid_boat_displacement(gid):
         return jsonify({'error': 'not found'}), 404
     d = _json_body('target_row', 'target_col')
     tr, tc = _coord(d, 'target_row', 'target_col')
-    target_tile = g.board.get((tr, tc))
-    if not target_tile:
-        return jsonify({'moves': []})
-
-    valid_set = set(map(tuple, VALID_SPACES))
-    gate_set = set(map(tuple, GATES))
-    flower = target_tile['flower']
-    fcol = FLOWER[flower]['color'] if flower in FLOWER else None
-
-    moves = []
-    for dr, dc in [(-1,0),(1,0),(0,-1),(0,1),(-1,-1),(-1,1),(1,-1),(1,1)]:
-        nr, nc = tr + dr, tc + dc
-        if (nr, nc) not in valid_set or (nr, nc) in gate_set or (nr, nc) in g.board:
-            continue
-        if fcol is not None:
-            gdn = garden_of(nr, nc)
-            if (fcol == 'red' and gdn == 'white') or (fcol == 'white' and gdn == 'red'):
-                continue
-        moves.append([nr, nc])
-    return jsonify({'moves': moves})
+    legal = [tuple(a) for a in g.get_legal_actions()]
+    moves = [[a[4], a[5]] for a in legal if a[0] == 'plant' and a[1] == 'Boat' and len(a) == 6 and (a[2], a[3]) == (tr, tc)]
+    direct = ('plant', 'Boat', tr, tc) in legal
+    return jsonify({'moves': moves, 'direct': direct})
 
 
 @app.route('/api/valid_plant_moves/<gid>', methods=['POST'])
@@ -343,18 +396,11 @@ def api_valid_plant_moves(gid):
         return jsonify({'error': 'not found'}), 404
     d = _json_body()
     tile = d.get('tile', '')
-    player = g.current_player
-
-    if tile in ('Rock', 'Wheel', 'Knotweed'):
-        moves = [list(pos) for pos in VALID_SPACES if pos not in set(GATES) and pos not in g.board]
-    elif tile == 'Boat':
-        moves = [list(pos) for pos, t in g.board.items()
-                 if t['player'] != player and not t['growing']]
-    elif tile in SPECIAL_TILES:
-        moves = [list(gate) for gate in GATES if gate not in g.board]
-    else:
-        moves = [list(gate) for gate in GATES if gate not in g.board]
-
+    seen, moves = set(), []
+    for a in g.get_legal_actions():
+        if a[0] == 'plant' and a[1] == tile and (a[2], a[3]) not in seen:
+            seen.add((a[2], a[3]))
+            moves.append([a[2], a[3]])
     return jsonify({'moves': moves})
 
 
@@ -370,7 +416,7 @@ def api_set_state(gid):
 
 @app.route('/api/set_agents', methods=['POST'])
 def api_set_agents():
-    d = request.get_json(silent=True) or {}
+    d = _optional_json_body()
     gid = d.get('gid') or 'default'
     names = _get_agent_names(gid)
     names['1'] = d.get('p1', 'Player 1')
@@ -419,7 +465,7 @@ def api_elo_rating():
 @app.route('/api/elo/session', methods=['GET', 'POST'])
 def api_elo_session():
     if request.method == 'POST':
-        d = request.json or {}
+        d = _optional_json_body()
         gid = d.get('gid') or 'default'
         session = _get_elo_session(gid)
         for field in ('p1_key', 'p2_key', 'p1_human_name', 'p2_human_name'):
@@ -473,7 +519,9 @@ def api_import_psn(gid):
     text = None
     requested_engine = DEFAULT_ENGINE
     if request.is_json:
-        data = request.get_json(silent=True) or {}
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({'error': 'request body must be a JSON object'}), 400
         text = data.get('psn')
         requested_engine = data.get('engine', DEFAULT_ENGINE)
     if text is None:
@@ -498,8 +546,8 @@ def api_import_psn(gid):
 
 @app.route('/api/load/<gid>', methods=['POST'])
 def api_load_game(gid):
-    data = request.json
-    if not data or 'state' not in data:
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or 'state' not in data:
         return jsonify({'error': 'invalid save file'}), 400
     try:
         games[gid] = game_class(data.get('engine', DEFAULT_ENGINE)).from_save_dict(data)
@@ -601,14 +649,14 @@ def api_bot_move(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
-    if g.winner:
+    if g.winner is not None:
         return jsonify({'error': 'game over', 'state': serialize(g)}), 400
 
-    d = request.json
+    d = _optional_json_body()
     bot_type = d.get('bot', 'random')
     params = d.get('params', {})
 
-    _save_snapshot(gid)
+    snap = g.clone()
     action = _bot_choose_action(gid, g, bot_type, params)
     if action is None:
         return jsonify({'error': 'no legal moves', 'state': serialize(g)}), 400
@@ -618,6 +666,7 @@ def api_bot_move(gid):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+    _push_snapshot(gid, snap)
     return jsonify({'state': serialize(g), 'action': list(action)})
 
 
@@ -681,7 +730,7 @@ def download_example(filename):
 @app.route('/api/training/start', methods=['POST'])
 @_require_api_token
 def api_training_start():
-    d = request.json
+    d = _optional_json_body()
     model = d.get('model')
     params = d.get('params', {})
     try:
@@ -764,7 +813,7 @@ def api_training_config_read():
 @app.route('/api/training/config', methods=['POST'])
 @_require_api_token
 def api_training_config_write():
-    d = request.json
+    d = _optional_json_body()
     model = d.get('model', '')
     content = d.get('content', '')
     path = _config_path_for(model)
@@ -807,7 +856,7 @@ def simulate_page():
 @app.route('/api/simulate/start', methods=['POST'])
 @_require_api_token
 def api_simulate_start():
-    d = request.json or {}
+    d = _optional_json_body()
     try:
         status = start_simulation(
             p1_model=d.get('p1_model'),

@@ -1,0 +1,5 @@
+{"name": "ring_large_cycle", "ref": "PDF p.7 no limit to ring size; bug B1",
+ "state": {"board": {"3,6": "Rose/1", "3,8": "Chrysanthemum/1", "3,10": "Rose/1", "3,12": "Chrysanthemum/1",
+                     "4,12": "Rose/1", "14,12": "Chrysanthemum/1", "15,12": "Rose/1", "15,11": "Chrysanthemum/1",
+                     "15,7": "Rose/1", "15,6": "Chrysanthemum/1", "13,6": "Rose/1", "5,6": "Chrysanthemum/1"}},
+ "checks": [{"expect": {"ring": {"1": true}}}]}

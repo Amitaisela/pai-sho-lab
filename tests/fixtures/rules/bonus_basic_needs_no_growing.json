@@ -1,0 +1,3 @@
+{"name": "bonus_basic_needs_no_growing", "ref": "PDF p.8 basic flower bonus only if no Growing flowers",
+ "state": {"board": {"17,9": "Rose/1/g"}, "bonus_turn": true},
+ "checks": [{"legal_includes": [["plant", "WhiteLotus", 1, 9]], "legal_excludes": [["plant", "Jasmine", 1, 9]]}]}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Skud Pai Sho</title>
+    <title>Pai Sho Lab</title>
     <link rel="preload" as="image" href="/static/tiles/HR3.png"><link rel="preload" as="image" href="/static/tiles/HR4.png"><link rel="preload" as="image" href="/static/tiles/HR5.png">
     <link rel="preload" as="image" href="/static/tiles/HW3.png"><link rel="preload" as="image" href="/static/tiles/HW4.png"><link rel="preload" as="image" href="/static/tiles/HW5.png">
     <link rel="preload" as="image" href="/static/tiles/GR3.png"><link rel="preload" as="image" href="/static/tiles/GR4.png"><link rel="preload" as="image" href="/static/tiles/GR5.png">
@@ -589,6 +589,14 @@
             max-width: 420px;
           }
         }
+
+        .setup-panel { position: absolute; z-index: 20; right: 16px; top: 64px; background: var(--panel, #1e1e1e);
+                       border: 1px solid var(--border, #444); border-radius: 8px; padding: 12px; max-width: 360px; }
+        .setup-panel .setup-title { font-weight: bold; margin-bottom: 6px; }
+        .setup-panel label { display: block; margin: 6px 0; }
+        .setup-accents { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; }
+        .setup-accents input { width: 40px; }
+        .setup-hint { font-size: 12px; opacity: .8; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -613,6 +621,7 @@
             <option value="python" selected>Engine: Python</option>
             <option value="rust">Engine: Rust</option>
         </select>
+        <button class="btn" id="setup-btn" onclick="toggleSetup()" title="Accents and opening for the next game">Setup</button>
         <button class="btn btn-accent" id="start-btn" onclick="startGame()">Start Game</button>
         <button class="btn" id="pause-btn" style="display:none" onclick="togglePause()">Pause</button>
         <button class="btn" id="undo-btn" onclick="stepBack()" disabled title="Step Back">◀</button>
@@ -620,6 +629,8 @@
         <button class="btn" onclick="saveGame()">Save</button>
         <button class="btn" onclick="document.getElementById('load-input').click()">Load</button>
         <input type="file" id="load-input" accept=".json" style="display:none" onchange="loadGame(event)">
+        <button class="btn" id="skip-btn" onclick="skipBonus()" disabled title="Decline this Harmony Bonus">Skip bonus</button>
+        <button class="btn" id="resign-btn" onclick="resignGame()" title="Resign this game">Resign</button>
         <button class="btn btn-accent" onclick="newGame()">New Game</button>
     </div>
 </header>
@@ -685,6 +696,24 @@
         </div>
     </div>
 </main>
+
+<div id="setup-panel" class="setup-panel" style="display:none">
+  <div class="setup-title">Next game setup</div>
+  <label>Opening
+    <select id="setup-opening">
+      <option value="random" selected>Random basic flower</option>
+      <option value="">Informal start (first move plants anywhere)</option>
+      <option>Rose</option><option>Chrysanthemum</option><option>Rhododendron</option>
+      <option>Jasmine</option><option>Lily</option><option>Jade</option>
+    </select>
+  </label>
+  <div class="setup-accents">
+    <div><b>Guest (Player 1) accents</b> <span id="setup-count-1"></span><div id="setup-accents-1"></div></div>
+    <div><b>Host (Player 2) accents</b> <span id="setup-count-2"></span><div id="setup-accents-2"></div></div>
+  </div>
+  <div class="setup-hint">Pick 4 accent tiles per player, at most 2 of each (rulebook default: one of each).</div>
+  <button class="btn btn-accent" onclick="applySetup()">Start a game with this setup</button>
+</div>
 
 <div id="win-overlay">
     <div class="win-card">
@@ -767,6 +796,9 @@
 
     const CIRCLE = ['Rose', 'Chrysanthemum', 'Rhododendron', 'Jasmine', 'Lily', 'Jade'];
 
+    // winner is null/undefined while playing, 1 or 2 for a win, 0 for a tie.
+    function isGameOver() { return state && state.winner !== null && state.winner !== undefined; }
+
     const ACCENT_META = {
       Rock:     { p1_img: 'HR.png',  p2_img: 'GR.png',  label: 'Rock' },
       Wheel:    { p1_img: 'HW.png',  p2_img: 'GW.png',  label: 'Wheel' },
@@ -786,12 +818,12 @@
       Jasmine:       'Jasmine — white flower, moves up to 3 spaces. Harmonises with Rhododendron and Lily.',
       Lily:          'Lily — white flower, moves up to 4 spaces. Harmonises with Jasmine and Jade.',
       Jade:          'Jade — white flower, moves up to 5 spaces. Harmonises with Lily and Rose.',
-      Rock:          'Rock (accent, bonus turn) — blocks a space so no flower can enter it.',
-      Wheel:         'Wheel (accent, bonus turn) — rotates the four surrounding flowers one step.',
-      Knotweed:      'Knotweed (accent, bonus turn) — disables harmonies for nearby flowers.',
-      Boat:          'Boat (accent, bonus turn) — picks up a flower and drops it on any legal space.',
-      Orchid:        'Orchid (special) — long-reach flower, up to 6 spaces.',
-      WhiteLotus:    'White Lotus (special) — short-reach flower, up to 2 spaces.',
+      Rock:          'Rock (accent, bonus) — cancels harmonies lying along its row and its column.',
+      Wheel:         'Wheel (accent, bonus) — rotates the 8 surrounding tiles one step clockwise; only where that move is legal and next to no Rock.',
+      Knotweed:      'Knotweed (accent, bonus) — tiles on its 8 surrounding points form no harmonies.',
+      Boat:          'Boat (accent, bonus) — on a blooming flower: moves it to an empty surrounding point; on an accent: removes both.',
+      Orchid:        'Orchid (special) — moves up to 6. Traps adjacent opposing blooming flowers; with your blooming White Lotus it is wild (captures and can be captured by flower tiles).',
+      WhiteLotus:    'White Lotus (special) — moves up to 2. Harmonises with every basic flower; the harmony belongs to the flower\'s owner.',
     };
 
     function getTileMeta(flower) {
@@ -856,6 +888,56 @@
       } catch (e) {}
     }, 2000);
 
+    const SETUP_ACCENTS = ['Rock', 'Wheel', 'Knotweed', 'Boat'];
+    function buildSetupPanel() {
+      for (const p of [1, 2]) {
+        const box = document.getElementById(`setup-accents-${p}`);
+        if (box.childElementCount) continue;
+        for (const a of SETUP_ACCENTS) {
+          const row = document.createElement('div');
+          row.innerHTML = `${a} <input type="number" min="0" max="2" value="1" id="setup-${p}-${a}" onchange="updateSetupCounts()">`;
+          box.appendChild(row);
+        }
+      }
+      updateSetupCounts();
+    }
+    function setupAccents(p) {
+      const out = [];
+      for (const a of SETUP_ACCENTS) {
+        const n = Math.max(0, Math.min(2, parseInt(document.getElementById(`setup-${p}-${a}`).value || '0', 10)));
+        for (let i = 0; i < n; i++) out.push(a);
+      }
+      return out;
+    }
+    function updateSetupCounts() {
+      for (const p of [1, 2]) {
+        const n = setupAccents(p).length;
+        const el = document.getElementById(`setup-count-${p}`);
+        el.textContent = `(${n}/4)`;
+        el.style.color = n === 4 ? '' : 'var(--danger, #e66)';
+      }
+    }
+    function toggleSetup() {
+      const panel = document.getElementById('setup-panel');
+      buildSetupPanel();
+      panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+    function currentSetup() {
+      const opening = document.getElementById('setup-opening')?.value;
+      const body = { opening: opening === '' ? null : (opening || 'random') };
+      if (document.getElementById('setup-accents-1')?.childElementCount) {
+        body.accents = { '1': setupAccents(1), '2': setupAccents(2) };
+      }
+      return body;
+    }
+    async function applySetup() {
+      for (const p of [1, 2]) {
+        if (setupAccents(p).length !== 4) { showError(`Player ${p} needs exactly 4 accents`); return; }
+      }
+      document.getElementById('setup-panel').style.display = 'none';
+      await newGame();
+    }
+
     async function newGame() {
       if (gameRunning) {
         gameAborted = true;
@@ -864,7 +946,8 @@
       }
 
       const engine = document.getElementById('engine-select')?.value || 'python';
-      const r = await post(`${API}/new_game`, {gid: GID, engine});
+      const r = await post(`${API}/new_game`, {gid: GID, engine, ...currentSetup()});
+      if (r.error) { showError(r.error); return; }
       state = r.state;
       cacheStaticData(state);
       selection = null;
@@ -984,7 +1067,7 @@
       if (!state.harmonies) return;
 
       for (const [pkey, cls] of [['1','harmony-line-p1'],['2','harmony-line-p2']]) {
-        const isWinner = state.winner && String(state.winner) === pkey;
+        const isWinner = isGameOver() && String(state.winner) === pkey;
         for (const [[r1,c1],[r2,c2]] of (state.harmonies[pkey]||[])) {
           const x1 = c1 * CELL + CELL / 2, y1 = r1 * CELL + CELL / 2;
           const x2 = c2 * CELL + CELL / 2, y2 = r2 * CELL + CELL / 2;
@@ -1071,22 +1154,26 @@
       document.getElementById(`p${cur}-panel`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    function hasGrowing(p) {
+      return Object.values(state.board).some(t => t.player === p && t.growing);
+    }
+
     function renderHands() {
       buildHands();
       const cur = state.current_player;
-      document.getElementById('p1-header').classList.toggle('active', cur===1 && !state.winner);
-      document.getElementById('p2-header').classList.toggle('active', cur===2 && !state.winner);
-      if (!state.winner) maybeScrollToActivePanel(cur);
+      document.getElementById('p1-header').classList.toggle('active', cur===1 && !isGameOver());
+      document.getElementById('p2-header').classList.toggle('active', cur===2 && !isGameOver());
+      if (!isGameOver()) maybeScrollToActivePanel(cur);
 
       for (const p of [1, 2]) {
         const hand = state.hands[String(p)];
-        const isMe = (p === cur) && !state.winner;
+        const isMe = (p === cur) && !isGameOver();
 
         for (const flower of CIRCLE) {
           const ref = handRefs[`${p}_${flower}`];
           const count = hand[flower] || 0;
           ref.countSpan.textContent = `×${count}`;
-          ref.btn.disabled = !isMe || count === 0;
+          ref.btn.disabled = !isMe || count === 0 || (state.bonus_turn && hasGrowing(p));
           ref.btn.classList.toggle('empty', count === 0);
           const isSel = selection?.type==='hand' && selection.flower===flower && selection.player===p;
           ref.btn.classList.toggle('selected', isSel);
@@ -1110,20 +1197,40 @@
     function renderStatus() {
       const bar = document.getElementById('status-bar');
       if (selection?.type === 'boat_target') {
-        bar.textContent = 'Choose where to displace the captured tile.';
+        bar.textContent = 'Choose an empty surrounding point to move that flower to.';
         bar.className = '';
       } else {
         bar.textContent = state.message;
-        bar.className   = (state.winner !== null && state.winner !== undefined) ? 'win' : '';
+        bar.className   = isGameOver() ? 'win' : '';
       }
 
-      if (state.winner !== null && state.winner !== undefined) {
+      if (isGameOver()) {
         const title = state.winner === 0 ? 'Tie!' : `Player ${state.winner} Wins!`;
         document.getElementById('win-title').textContent = title;
         document.getElementById('win-sub').textContent = state.message || '';
         document.getElementById('win-overlay').classList.add('show');
         renderEloDelta();
       }
+
+      const skip = document.getElementById('skip-btn');
+      if (skip) skip.disabled = !(state.can_skip_bonus && isHumanTurn() && !isGameOver());
+      const resign = document.getElementById('resign-btn');
+      if (resign) resign.disabled = isGameOver() || resigningSeat() === null;
+    }
+
+    // Which seat resigns when Resign is clicked, independent of whose turn
+    // it is: with exactly one human seat, that seat always resigns (a human
+    // clicking Resign while the AI is to move must resign the human, not
+    // hand the AI a rated win). With two human seats, it's whoever's turn it
+    // is at the board. With no human seat (AI vs AI), resigning makes no
+    // sense - returns null so the caller can disable the button.
+    function resigningSeat() {
+      const p1Human = getPlayerConfig(1).type === 'human';
+      const p2Human = getPlayerConfig(2).type === 'human';
+      if (p1Human && p2Human) return state ? state.current_player : null;
+      if (p1Human) return 1;
+      if (p2Human) return 2;
+      return null;
     }
 
     function fmtDelta(d) {
@@ -1187,8 +1294,11 @@
     }
 
     function formatMove(move) {
+      if (move[0] === 'plant' && move.length === 6)
+        return `Boat on (${move[2]},${move[3]}) → flower to (${move[4]},${move[5]})`;
       if (move[0] === 'plant') return `Plant ${move[1]} at (${move[2]},${move[3]})`;
       if (move[0] === 'arrange') return `Move (${move[1]},${move[2]}) → (${move[3]},${move[4]})`;
+      if (move[0] === 'skip_bonus') return 'Skip bonus';
       return move.join(' ');
     }
 
@@ -1205,7 +1315,8 @@
       for (let i = 0; i < allMoves.length; i++) {
         const move = allMoves[i];
         const num = i + 1;
-        const player = (i % 2 === 0) ? 1 : 2;
+        const players = state.history_players || [];
+        const player = players.length === history.length && i < players.length ? players[i] : ((i % 2 === 0) ? 1 : 2);
         const isFuture = i >= history.length;
         const pColor = isFuture ? 'var(--text-dim)' : (player === 1 ? 'var(--p1)' : 'var(--p2)');
         const opacity = isFuture ? 'opacity:0.4;' : '';
@@ -1215,8 +1326,28 @@
       container.innerHTML = html;
     }
 
+    async function skipBonus() {
+      if (!state?.can_skip_bonus || !isHumanTurn()) return;
+      const r = await post(`${API}/skip_bonus/${GID}`, {});
+      if (r.error) { showError(r.error); return; }
+      state = r.state;
+      canUndo = true; canRedo = false; futureHistory = []; updateUndoRedoButtons();
+      selection = null; validMoves = []; validMovesSet = new Set();
+      renderAll();
+    }
+    async function resignGame() {
+      if (!state || isGameOver()) return;
+      const seat = resigningSeat();
+      if (seat === null) return;
+      if (!confirm(`Resign as Player ${seat}?`)) return;
+      const r = await post(`${API}/resign/${GID}`, { player: seat });
+      if (r.error) { showError(r.error); return; }
+      state = r.state;
+      renderAll();
+    }
+
     async function onHandClick(player, flower) {
-      if (player !== state.current_player || state.winner) return;
+      if (player !== state.current_player || isGameOver()) return;
       if (!isHumanTurn()) return;
       const isAccentOrSpecial = (flower in ACCENT_META) || (flower in SPECIAL_META);
       if (isAccentOrSpecial && !state.bonus_turn) return;
@@ -1227,13 +1358,8 @@
         validMovesSet = new Set();
       } else {
         selection = { type:'hand', flower, player };
-        if (isAccentOrSpecial) {
-          const r = await post(`${API}/valid_plant_moves/${GID}`, { tile: flower });
-          validMoves = r.moves || [];
-        } else {
-          const gates = cachedStatic ? cachedStatic.gates : state.gates;
-          validMoves = gates.filter(([r,c]) => !state.board[`${r},${c}`]);
-        }
+        const r = await post(`${API}/valid_plant_moves/${GID}`, { tile: flower });
+        validMoves = r.moves || [];
         validMovesSet = buildMovesSet(validMoves);
       }
       renderAll();
@@ -1253,8 +1379,11 @@
     }
 
     async function onTileClick(r, c) {
-      if (state.winner) return;
+      if (isGameOver()) return;
       if (!isHumanTurn()) return;
+      if (selection?.type === 'hand' || selection?.type === 'boat_target') {
+        return onCellClick(r, c);
+      }
       const key  = `${r},${c}`;
       const tile = state.board[key];
 
@@ -1278,7 +1407,7 @@
     }
 
     async function onCellClick(r, c) {
-      if (!selection || state.winner) return;
+      if (!selection || isGameOver()) return;
       if (!isHumanTurn()) return;
 
       if (!validMovesSet.has(`${r},${c}`)) {
@@ -1305,19 +1434,16 @@
 
       if (selection.type === 'hand') {
         if (selection.flower === 'Boat') {
-          const key = `${r},${c}`;
-          const target = state.board[key];
-          if (target && !ACCENT_META[target.flower]) {
-            const dr = await post(`${API}/valid_boat_displacement/${GID}`,
-              { target_row: r, target_col: c });
-            if (dr.moves && dr.moves.length > 0) {
-              selection = { type: 'boat_target', targetRow: r, targetCol: c };
-              validMoves = dr.moves;
-              validMovesSet = buildMovesSet(dr.moves);
-              renderAll();
-              return;
-            }
+          const dr = await post(`${API}/valid_boat_displacement/${GID}`, { target_row: r, target_col: c });
+          if (!dr.direct) {
+            if (!dr.moves || dr.moves.length === 0) { showError('No legal Boat move on that tile'); return; }
+            selection = { type: 'boat_target', targetRow: r, targetCol: c };
+            validMoves = dr.moves;
+            validMovesSet = buildMovesSet(dr.moves);
+            renderAll();
+            return;
           }
+          // Boat on an accent: both tiles leave the game, no displacement to choose.
         }
         const r2 = await post(`${API}/plant/${GID}`, { flower: selection.flower, row: r, col: c });
         if (r2.error) { showError(r2.error); return; }
@@ -1591,7 +1717,7 @@
     }
 
     async function runBotLoop(p1, p2) {
-      while (!gameAborted && state && !state.winner) {
+      while (!gameAborted && state && !isGameOver()) {
         const cur = state.current_player;
         const cfg = cur === 1 ? p1 : p2;
 
@@ -1609,7 +1735,7 @@
                   renderAll();
                   clearInterval(check);
                   resolve();
-                } else if (data.state && data.state.winner) {
+                } else if (data.state && data.state.winner !== null && data.state.winner !== undefined) {
                   state = data.state;
                   renderAll();
                   clearInterval(check);

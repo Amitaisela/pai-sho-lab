@@ -1,0 +1,5 @@
+{"name": "wheel_rotates", "ref": "PDF p.10 Wheel rotates the 8 surrounding tiles clockwise",
+ "state": {"board": {"11,13": "Jade/1"}, "bonus_turn": true},
+ "checks": [{"legal_includes": [["plant", "Wheel", 12, 13]]},
+            {"step": ["plant", "Wheel", 12, 13],
+             "expect": {"board": {"11,13": null, "11,14": "Jade/1", "12,13": "Wheel/1"}, "hands": {"1": {"Wheel": 0}}}}]}

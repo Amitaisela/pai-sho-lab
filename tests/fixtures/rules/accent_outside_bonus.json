@@ -1,0 +1,3 @@
+{"name": "accent_outside_bonus", "ref": "PDF p.10 accents only as a Harmony Bonus",
+ "state": {"board": {}},
+ "checks": [{"step": ["plant", "Rock", 12, 13], "raises": true, "expect": {"board": {"12,13": null}}}]}

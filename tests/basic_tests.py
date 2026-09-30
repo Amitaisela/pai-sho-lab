@@ -69,7 +69,7 @@ class _Runner:
 # ---------- helpers ----------
 
 def _fresh():
-    return PaiShoGame()
+    return PaiShoGame(opening=None)
 
 
 def _bare():
@@ -127,7 +127,7 @@ def test_initial_hands():
     g = _fresh()
     for p in (1, 2):
         for f in CIRCLE:
-            assert g.hands[p][f] == 2
+            assert g.hands[p][f] == 3
         for f in ACCENT_TILES + SPECIAL_TILES:
             assert g.hands[p][f] == 1
 
@@ -304,6 +304,44 @@ def test_registry_contains_expected_agents():
         assert required in keys, f'missing agent: {required}'
 
 
+def test_house_levels_survive_distillation():
+    # The distilled mirror only ships 2 of the 6 house bots (cnn_basic and
+    # basic_minimax), so their levels (1 and 6) are NOT contiguous here.
+    # validate_registry() only requires unique + positive, which is exactly
+    # the invariant that survives pruning to any subset; contiguous 1..N
+    # is asserted separately against the full roster in tests/test.py.
+    from Agents.registry import get_agent, house_bots, validate_registry
+    errors = validate_registry()
+    assert not errors, f'registry validation failed: {errors}'
+
+    random_entry = get_agent('random')
+    assert 'house_level' not in random_entry, 'random must not carry a house_level'
+
+    bots = house_bots()
+    levels = [b['house_level'] for b in bots]
+    assert levels == sorted(levels), 'house_bots() must be sorted ascending by level'
+    assert len(levels) == len(set(levels)), 'house_level values must be unique'
+    assert all(isinstance(lv, int) and lv > 0 for lv in levels), 'house_level must be a positive int'
+
+    by_key = {b['key']: b for b in bots}
+    assert by_key['cnn_basic']['house_level'] == 1
+    assert by_key['cnn_basic']['label'] == 'MushiBot level 1'
+    assert by_key['basic_minimax']['house_level'] == 6
+    assert by_key['basic_minimax']['label'] == 'MushiBot level 6'
+
+
+# ---------- local arena scripts ----------
+
+def test_local_arena_scripts_run():
+    from scripts.eval_agents import evaluate
+    from scripts.round_robin import fit_elo, run_round_robin
+    r = evaluate('random', 'basic_minimax', games=2, engine='python', max_steps=8, allow_untrained=True)
+    assert r['games'] == 2
+    res = run_round_robin(['random', 'basic_minimax'], games_per_pair=2, engine='python',
+                          max_steps=8, workers=1, seed=0, allow_untrained=True)
+    assert set(fit_elo(res)) == {'random', 'basic_minimax'}
+
+
 # ---------- dispatch ----------
 
 TESTS = [
@@ -337,6 +375,9 @@ TESTS = [
     ('CNNBasic/save_load_roundtrip',     test_cnn_save_load_roundtrip),
 
     ('Registry/has_expected_agents',     test_registry_contains_expected_agents),
+    ('Registry/house_levels_survive_distillation', test_house_levels_survive_distillation),
+
+    ('LocalArena/scripts_run',           test_local_arena_scripts_run),
 ]
 
 

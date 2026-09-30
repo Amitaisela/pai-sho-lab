@@ -1,0 +1,5 @@
+{"name": "from_dict_history_and_message", "ref": "engine contract: from_dict restores history, its players and the message identically in both engines",
+ "state": {"board": {"17,9": "Rose/1/g"}, "current_player": 2,
+           "history": [["plant", "Rose", 17, 9]], "history_players": [1], "message": "custom message"},
+ "checks": [{"expect": {"history": [["plant", "Rose", 17, 9]], "history_players": [1]}},
+            {"step": ["plant", "Lily", 1, 9], "expect": {"history": [["plant", "Rose", 17, 9], ["plant", "Lily", 1, 9]], "history_players": [1, 2]}}]}

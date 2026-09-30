@@ -1,0 +1,4 @@
+{"name": "capture_uncovers_clash", "ref": "spec §2.5: no action may produce a clash, including clashes uncovered by vacating a square",
+ "note": "Lily/1 at (4,8) blocks Rose/1 (4,5) from Jasmine/2 (4,11). Capturing the Chrysanthemum at (5,9) is legal without the Rose (verified), but here it vacates (4,8) and uncovers the Rose-Jasmine clash.",
+ "state": {"board": {"4,5": "Rose/1", "4,8": "Lily/1", "4,11": "Jasmine/2", "5,9": "Chrysanthemum/2"}},
+ "checks": [{"legal_excludes": [["arrange", 4, 8, 5, 9]], "destinations_exclude": {"4,8": [[5, 9]]}}]}

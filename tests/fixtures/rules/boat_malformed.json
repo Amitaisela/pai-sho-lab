@@ -1,0 +1,6 @@
+{"name": "boat_malformed", "ref": "engine contract: malformed Boat actions raise ValueError",
+ "state": {"board": {"12,13": "Rose/1", "12,14": "Lily/1"}, "bonus_turn": true},
+ "checks": [{"step": ["plant", "Boat", 12, 13], "raises": true},
+            {"step": ["plant", "Boat", 12, 13, 12, 14], "raises": true},
+            {"step": ["plant", "Boat", 12, 13, 12], "raises": true},
+            {"expect": {"board": {"12,13": "Rose/1", "12,14": "Lily/1"}, "hands": {"1": {"Boat": 1}}}}]}

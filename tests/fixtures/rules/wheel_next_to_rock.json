@@ -1,0 +1,3 @@
+{"name": "wheel_next_to_rock", "ref": "PDF p.10 Wheel: not on a point surrounding a Rock",
+ "state": {"board": {"12,14": "Rock/2"}, "bonus_turn": true},
+ "checks": [{"legal_includes": [["plant", "Wheel", 12, 11]], "legal_excludes": [["plant", "Wheel", 12, 13]]}]}

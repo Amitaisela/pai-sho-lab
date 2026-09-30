@@ -4,6 +4,7 @@ import time
 import os
 import json
 import argparse
+import types
 from tqdm import tqdm
 
 # engine_select.py is a loose module directly under engine/, not a package matched by
@@ -12,6 +13,7 @@ from tqdm import tqdm
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'engine'))
 
 from PythonEngine.notation import game_to_psn
+from Agents.actions import action_kind, arrange_parts, plant_parts
 from Agents.registry import get_agent
 from Agents.agent_loader import instantiate, act
 from Agents.logging_utils import get_logger, log_event
@@ -95,7 +97,8 @@ def save_result_to_csv(p1_model, p2_model, winner, turn_count, duration):
             f.write("timestamp,winner,turns,duration_seconds,p1_model,p2_model\n")
 
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-        winner_status = winner if winner else 0
+        # 0 = tie, empty = timeout (no winner) -- keep these distinguishable in the CSV.
+        winner_status = '' if winner is None else winner
         f.write(f"{timestamp},{winner_status},{turn_count},{duration:.2f},{p1_model},{p2_model}\n")
 
 
@@ -123,26 +126,29 @@ def save_game_to_psn(game, game_id, p1_spec, p2_spec):
 
 
 def play_move(action):
-    action_type = action[0]
-    if action_type == 'plant':
-        _, flower, r, c = action
+    kind = action_kind(action)
+    if kind == 'plant':
+        flower, r, c, displace = plant_parts(action)
         payload = {"flower": flower, "row": r, "col": c}
+        if displace is not None:
+            payload['displace_row'], payload['displace_col'] = displace
         res = requests.post(f"{SERVER_URL}/api/plant/{GAME_ID}", json=payload)
-    elif action_type == 'arrange':
-        _, fr, fc, tr, tc = action
+    elif kind == 'arrange':
+        fr, fc, tr, tc = arrange_parts(action)
         payload = {"from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc}
         res = requests.post(f"{SERVER_URL}/api/arrange/{GAME_ID}", json=payload)
+    else:
+        res = requests.post(f"{SERVER_URL}/api/skip_bonus/{GAME_ID}")
     return res.json()
 
 
-def _classify_win_reason(message):
-    if not message:
-        return None
-    if "Harmony Ring" in message:
-        return 'harmony_ring'
-    if "Last Basic Flower" in message:
-        return 'last_basic_flower'
-    return None
+_REASON_LABELS = {'ring': 'harmony_ring', 'last_basic_flower': 'last_basic_flower',
+                  'no_moves': 'no_moves', 'resign': 'resign'}
+
+
+def _win_reason(game):
+    """Stable label for why a finished game ended, from the engine's end_reason."""
+    return _REASON_LABELS.get(getattr(game, 'end_reason', None))
 
 
 def print_report(results, p1_spec, p2_spec, total_time):
@@ -152,16 +158,25 @@ def print_report(results, p1_spec, p2_spec, total_time):
 
     p1_wins = sum(1 for r in results if r['winner'] == 1)
     p2_wins = sum(1 for r in results if r['winner'] == 2)
+    # 'draws' keeps its original (pre-fix) meaning for compatibility: any game
+    # that didn't end with a 1/2 winner, whether a genuine tie (winner == 0)
+    # or a simulator-side timeout (winner is None, max_steps hit before the
+    # engine reached an end state). 'ties' and 'timeouts' below split those
+    # two apart for callers that care about the distinction.
     draws = sum(1 for r in results if r['winner'] is None or r['winner'] == 0)
+    ties = sum(1 for r in results if r['winner'] == 0)
+    timeouts = sum(1 for r in results if r['winner'] is None)
 
-    win_reason_counts = {1: {'harmony_ring': 0, 'last_basic_flower': 0},
-                         2: {'harmony_ring': 0, 'last_basic_flower': 0}}
+    # Tally every end_reason the engine can report (not just ring/last_basic_flower),
+    # so resigns and no-legal-moves endings show up in the summary too.
+    win_reason_counts = {1: {label: 0 for label in _REASON_LABELS.values()},
+                         2: {label: 0 for label in _REASON_LABELS.values()}}
     for r in results:
         w = r.get('winner')
         if w not in (1, 2):
             continue
-        kind = _classify_win_reason(r.get('message'))
-        if kind in ('harmony_ring', 'last_basic_flower'):
+        kind = _win_reason(types.SimpleNamespace(end_reason=r.get('end_reason')))
+        if kind in win_reason_counts[w]:
             win_reason_counts[w][kind] += 1
 
     turns = [r['turns'] for r in results]
@@ -181,10 +196,16 @@ def print_report(results, p1_spec, p2_spec, total_time):
     log.info(f"  P1 ({p1_name}) wins:  {p1_wins:>4}  ({p1_wins / n * 100:.1f}%)")
     log.info(f"    by Harmony Ring:         {win_reason_counts[1]['harmony_ring']:>4}")
     log.info(f"    by Last Basic Flower:    {win_reason_counts[1]['last_basic_flower']:>4}")
+    log.info(f"    by No Legal Moves:       {win_reason_counts[1]['no_moves']:>4}")
+    log.info(f"    by Resignation:          {win_reason_counts[1]['resign']:>4}")
     log.info(f"  P2 ({p2_name}) wins:  {p2_wins:>4}  ({p2_wins / n * 100:.1f}%)")
     log.info(f"    by Harmony Ring:         {win_reason_counts[2]['harmony_ring']:>4}")
     log.info(f"    by Last Basic Flower:    {win_reason_counts[2]['last_basic_flower']:>4}")
+    log.info(f"    by No Legal Moves:       {win_reason_counts[2]['no_moves']:>4}")
+    log.info(f"    by Resignation:          {win_reason_counts[2]['resign']:>4}")
     log.info(f"  Draws/Stalemates:     {draws:>4}  ({draws / n * 100:.1f}%)")
+    log.info(f"    Ties:                    {ties:>4}")
+    log.info(f"    Timeouts:                {timeouts:>4}")
     log.info(f"{'─' * 50}")
     log.info(f"  Turns   - avg: {avg_turns:.1f}  min: {min_turns}  max: {max_turns}")
     log.info(f"  Game duration - avg: {avg_duration:.2f}s  total: {total_time:.2f}s")
@@ -208,6 +229,12 @@ def print_report(results, p1_spec, p2_spec, total_time):
               p1_last_basic_flower_wins=win_reason_counts[1]['last_basic_flower'],
               p2_harmony_ring_wins=win_reason_counts[2]['harmony_ring'],
               p2_last_basic_flower_wins=win_reason_counts[2]['last_basic_flower'],
+              # New: every end_reason, plus ties/timeouts split out of 'draws'.
+              p1_no_moves_wins=win_reason_counts[1]['no_moves'],
+              p1_resign_wins=win_reason_counts[1]['resign'],
+              p2_no_moves_wins=win_reason_counts[2]['no_moves'],
+              p2_resign_wins=win_reason_counts[2]['resign'],
+              ties=ties, timeouts=timeouts,
               avg_turns=round(avg_turns, 2),
               min_turns=min_turns, max_turns=max_turns,
               avg_duration=round(avg_duration, 3),
@@ -248,7 +275,7 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
                 time.sleep(2)
                 continue
 
-            if state['winner']:
+            if state['winner'] is not None:
                 reason = state.get('message', '') or ''
                 log.info(f"\n{'=' * 30}\nGAME OVER! Winner: {state['winner']}\nReason: {reason}\n{'=' * 30}")
                 break
@@ -297,14 +324,16 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
 
         duration = time.time() - start_time
         game_message = state.get('message', '') or ''
+        end_reason = state.get('end_reason')
         results.append({'id': i + 1, 'winner': state.get('winner'), 'turns': turn_count,
-                        'duration': duration, 'message': game_message})
+                        'duration': duration, 'message': game_message, 'end_reason': end_reason})
         log_event(log, "game_end", mode="flask", game_id=i + 1,
                   p1=p1_spec, p2=p2_spec,
                   winner=state.get('winner'), turns=turn_count,
                   duration=round(duration, 3),
                   reason=game_message,
-                  win_reason=_classify_win_reason(game_message) if state.get('winner') in (1, 2) else None)
+                  win_reason=_win_reason(types.SimpleNamespace(end_reason=end_reason))
+                  if state.get('winner') in (1, 2) else None)
         if state.get('winner') == 1:
             p1_wins += 1
         elif state.get('winner') == 2:
@@ -388,19 +417,22 @@ def run_local(iterations, p1_spec, p2_spec, save, verbose=True, save_games=False
             verbose=verbose, max_steps=max_steps, engine=engine,
         )
         log.info(f"\n{'=' * 30}\nGAME {game_id} OVER\n{'=' * 30}")
-        if winner:
+        if winner in (1, 2):
             log.info(f"WINNER: Player {winner}\nMessage: {message}")
+        elif winner == 0:
+            log.info("It's a tie!")
         else:
-            log.info("It's a draw/stalemate!")
+            log.info("Stalemate! (timeout, no winner)")
 
+        end_reason = getattr(game, 'end_reason', None)
         results.append({'id': game_id, 'winner': winner, 'turns': turn_count,
-                        'duration': duration, 'message': message or ''})
+                        'duration': duration, 'message': message or '', 'end_reason': end_reason})
         log_event(log, "game_end", mode="local", game_id=game_id,
                   p1=p1_spec, p2=p2_spec,
                   winner=winner, turns=turn_count,
                   duration=round(duration, 3),
                   reason=message or '',
-                  win_reason=_classify_win_reason(message) if winner in (1, 2) else None)
+                  win_reason=_win_reason(game) if winner in (1, 2) else None)
         if winner == 1:
             p1_wins += 1
         elif winner == 2:

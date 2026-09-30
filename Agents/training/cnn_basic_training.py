@@ -71,7 +71,7 @@ def _play_episode(agent, max_steps, epsilon, opp_fn=None):
             break
         game.step(action)
         steps += 1
-    message = getattr(game, 'message', '') or '' if game.winner else ''
+    message = getattr(game, 'message', '') or '' if game.winner is not None else ''
     return transitions, game.winner, steps, message
 
 
@@ -111,8 +111,8 @@ def train_cnn(
         t0 = time.time()
         transitions, winner, steps, reason = _play_episode(agent, max_steps, epsilon, opp_fn)
         tallies = {1: 0, 2: 0, 0: 0}
-        tallies[winner if winner else 0] += 1
-        wins[winner if winner else 0] += 1
+        tallies[winner if winner in (1, 2) else 0] += 1
+        wins[winner if winner in (1, 2) else 0] += 1
 
         loss_val = 0.0
         if transitions:

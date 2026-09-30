@@ -1,0 +1,5 @@
+{"name": "ending_both_rings", "ref": "PDF p.15 both rings = tie",
+ "state": {"board": {"3,6": "Rose/1", "3,12": "Chrysanthemum/1", "15,12": "Rose/1", "15,5": "Chrysanthemum/1",
+                     "5,2": "Jasmine/2", "5,16": "Lily/2", "13,16": "Jasmine/2", "13,2": "Lily/2"}},
+ "checks": [{"expect": {"ring": {"1": false, "2": true}}},
+            {"step": ["arrange", 15, 5, 15, 6], "expect": {"winner": 0, "end_reason": "ring"}}]}

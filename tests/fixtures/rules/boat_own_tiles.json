@@ -1,0 +1,6 @@
+{"name": "boat_own_tiles", "ref": "rules page: Boat on any Blooming Flower or Accent; moves it to an empty surrounding point",
+ "state": {"board": {"12,13": "Rose/1"}, "bonus_turn": true},
+ "checks": [{"legal_includes": [["plant", "Boat", 12, 13, 12, 14]],
+             "legal_excludes": [["plant", "Boat", 12, 13], ["plant", "Boat", 12, 13, 11, 13]]},
+            {"step": ["plant", "Boat", 12, 13, 12, 14],
+             "expect": {"board": {"12,13": "Boat/1", "12,14": "Rose/1"}, "hands": {"1": {"Boat": 0}}}}]}

@@ -1,0 +1,3 @@
+{"name": "midline_on_midline", "ref": "PDF p.15 harmonies with a tile on a midline don't count; bug B5",
+ "state": {"board": {"9,3": "Rose/1", "9,12": "Chrysanthemum/1", "12,4": "Rose/1", "12,13": "Chrysanthemum/1"}},
+ "checks": [{"expect": {"midline": {"1": 1}}}]}

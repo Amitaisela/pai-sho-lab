@@ -1,0 +1,3 @@
+{"name": "setup_invalid_accents", "ref": "PDF p.6 accent tiles: 2 of each",
+ "setup": {"opening": null, "accents": {"1": ["Rock", "Rock", "Rock", "Boat"], "2": ["Rock", "Wheel", "Knotweed", "Boat"]}},
+ "constructor_raises": true}

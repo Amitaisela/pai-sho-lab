@@ -5,4 +5,5 @@ pub mod harmony;
 pub mod moves;
 pub mod piece;
 pub mod player;
+pub mod setup;
 pub mod tile;

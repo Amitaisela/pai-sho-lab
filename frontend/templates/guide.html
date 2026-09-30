@@ -433,7 +433,11 @@ class MyAgent:
         ...
 
     def <span class="highlight">choose_action</span>(self, game, verbose=False):
-        """Return one legal action: ('plant', flower, r, c) or ('arrange', fr, fc, tr, tc)."""
+        """Return one legal action from game.get_legal_actions(), or None if it's empty.
+        Shapes: ('plant', flower, r, c); ('plant', 'Boat', r, c, dr, dc) for a Boat
+        displacing a flower; ('arrange', fr, fc, tr, tc); ('skip_bonus',) to decline a
+        Harmony Bonus. Use Agents/actions.py's action_kind()/plant_parts()/arrange_parts()
+        instead of unpacking actions by a fixed length."""
         legal = game.get_legal_actions()
         <span class="dim"># ... your logic ...</span>
         return best_action</code></pre>
@@ -466,22 +470,18 @@ class MyAgent:
     </ul>
 
     <h3>Stdout format for live progress</h3>
-    <p>The training dashboard parses stdout lines to show real-time stats. You can reuse an existing log format or add a new parser. The built-in parsers recognize these formats:</p>
+    <p>The recommended way to report progress is to emit structured <code>EVENT:{json}</code> lines with <code>Agents/logging_utils.py</code>: <code>from Agents.logging_utils import get_logger, log_event</code>, then <code>log_event(log, "episode", episode=i, total=N, outcome=..., steps=...)</code>. <code>backend/ui/training_manager.py</code> parses these lines for the progress bar and always prefers them. New agents should set <code>"log_parser": None</code> in the registry and rely on EVENT lines exclusively.</p>
 
-    <pre><code><span class="dim"># PPO / Set Transformer format (log_parser: "ppo")</span>
-Episode 100/5,000 | eps=0.28 | P1 wins in 234 steps | W1=55 W2=40 D=5 | PL=0.023 VL=0.156 | params=12,544 | 3.21s
+    <p class="dim" style="font-size:.85rem;">The regex-based parsers below are a <strong>legacy fallback</strong> for stdout that predates EVENT lines, kept for a few existing agents. Don't build new agents around them.</p>
 
-<span class="dim"># TD Learning format (log_parser: "td_learning")</span>
-Episode 100/5,000 | eps=0.28 | P1 wins in 234 steps | W1=55 W2=40 D=5 | 3.21s
+    <pre><code><span class="dim"># Basic Minimax format (legacy log_parser: "basic_minimax")</span>
+Episode 100/5,000 | eps=0.28 | P1 wins in 234 steps | W1=55 W2=40 D=5 | wr=0.640 | weights=12,544 | 3.21s
 
-<span class="dim"># Monte Carlo format (log_parser: "monte_carlo")</span>
-Episode 100/1,000 | Eps: 0.95 | P1 wins in 312 steps | Q-Table: 45,231 (+128) | Took 1.23s
-
-<span class="dim"># NEAT format (log_parser: "neat")</span>
+<span class="dim"># NEAT format (legacy log_parser: "neat")</span>
 Generation 25</code></pre>
 
     <div class="tip">
-        <strong>Tip:</strong> The easiest path is to print in the PPO format and set <code>"log_parser": "ppo"</code> in the registry. If you need a custom format, add a regex + extractor function to <code>ui/training_manager.py</code>'s <code>_LOG_PARSERS</code> dict.
+        <strong>Tip:</strong> The easiest path is to emit <code>EVENT:</code> lines via <code>log_event(...)</code> and set <code>"log_parser": None</code> in the registry. If you need a custom legacy regex format instead, add it to <code>backend/ui/training_manager.py</code>'s <code>_LOG_PARSERS</code> dict.
     </div>
 
     <!-- Step 3 -->
@@ -512,8 +512,8 @@ Generation 25</code></pre>
                        tooltip="Continue from saved checkpoint", cli_flag="--resume"),
     ],
     "total_episodes_key": "episodes",    <span class="dim"># drives the progress bar</span>
-    "log_parser": "ppo",                 <span class="dim"># reuse PPO's stdout parser</span>
-    "config_file": null,                 <span class="dim"># editable config file path, or null</span>
+    "log_parser": None,                  <span class="dim"># EVENT: lines carry progress; legacy regex parsers exist but aren't needed for new agents</span>
+    "config_file": None,                 <span class="dim"># editable config file path, or None</span>
 }</code></pre>
 
     <h3>Registry field reference</h3>
@@ -532,8 +532,8 @@ Generation 25</code></pre>
         <tr><td><code>training_script</code></td><td>Relative path to the training script. <code>null</code> if not trainable (agent won't appear on training page).</td></tr>
         <tr><td><code>training_params</code></td><td>Hyperparameter definitions for the training UI, built with the same <code>num_param</code>/<code>text_param</code>/<code>checkbox_param</code> helpers. Each carries <code>key</code>, <code>label</code>, <code>type</code>, <code>default</code>, an optional <code>tooltip</code>/<code>min</code>/<code>max</code>/<code>step</code>, and a required <code>cli_flag</code> — the CLI flag on the training script this param maps to (e.g. <code>cli_flag="--n"</code>). No separate CLI-mapping table to keep in sync.</td></tr>
         <tr><td><code>total_episodes_key</code></td><td>Which <code>training_params</code> key represents the total count (drives the progress bar).</td></tr>
-        <tr><td><code>log_parser</code></td><td>Key into the parser registry in <code>training_manager.py</code>. Reuse <code>"ppo"</code>, <code>"td_learning"</code>, <code>"monte_carlo"</code>, <code>"neat"</code>, or add your own.</td></tr>
-        <tr><td><code>config_file</code></td><td>Path to an editable config file (shown in training UI). <code>null</code> for most agents.</td></tr>
+        <tr><td><code>log_parser</code></td><td>Legacy regex fallback for stdout that predates <code>EVENT:</code> lines: key into the parser registry in <code>backend/ui/training_manager.py</code> (<code>"neat"</code>, <code>"basic_minimax"</code>, or <code>None</code>). Structured <code>EVENT:</code> lines always take priority, so new agents should use <code>None</code> and emit EVENT lines via <code>Agents/logging_utils.py</code>'s <code>log_event(...)</code>.</td></tr>
+        <tr><td><code>config_file</code></td><td>Path to an editable config file (shown in training UI). <code>None</code> for most agents.</td></tr>
     </table>
 
     <div class="tip">

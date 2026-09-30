@@ -2,6 +2,12 @@ import os
 
 DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data'))
 
+# Official-rules tile counts (engine/PythonEngine/PaiShoGame.py: BASIC_PER_KIND=3, ACCENTS_PER_PLAYER=4,
+# one Orchid and one White Lotus). Used to keep hand/board features within [0, 1].
+MAX_PER_BASIC = 3
+MAX_BASICS_PER_PLAYER = 3 * 6
+MAX_HAND_SIZE = MAX_BASICS_PER_PLAYER + 4 + 2
+
 
 def _ring_threat_level(harmonies):
     """Return 0, 1, or 2 based on how close the player is to a harmony ring."""

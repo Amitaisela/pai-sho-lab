@@ -1,0 +1,4 @@
+{"name": "ending_last_basic_flower", "ref": "PDF p.15 Playing Last Basic Flower Tile",
+ "state": {"board": {}, "hands": {"1": {"Rose": 1, "Chrysanthemum": 0, "Rhododendron": 0, "Jasmine": 0, "Lily": 0, "Jade": 0}}},
+ "checks": [{"step": ["plant", "Rose", 9, 1], "expect": {"winner": 0, "end_reason": "last_basic_flower"}},
+            {"legal_count": 0}]}

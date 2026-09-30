@@ -16,6 +16,7 @@ COPY Agents/ Agents/
 COPY engine/ engine/
 COPY backend/ backend/
 COPY frontend/ frontend/
+COPY scripts/ scripts/
 RUN pip install --no-cache-dir -r requirements.txt \
  && pip install --no-cache-dir -e . \
  && pip install --no-cache-dir maturin \

@@ -1,0 +1,4 @@
+{"name": "capture_basic_clash", "ref": "PDF p.9 capture by landing on a clashing tile",
+ "state": {"board": {"12,13": "Rose/1", "13,14": "Jasmine/2"}},
+ "checks": [{"destinations_include": {"12,13": [[13,14]]}},
+            {"step": ["arrange", 12, 13, 13, 14], "expect": {"board": {"13,14": "Rose/1", "12,13": null}, "current_player": 2}}]}

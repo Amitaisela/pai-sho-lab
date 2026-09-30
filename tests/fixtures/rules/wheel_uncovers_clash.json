@@ -1,0 +1,5 @@
+{"name": "wheel_uncovers_clash", "ref": "spec §2.5/§2.9: a Wheel may not rotate a blocker out of a clash line",
+ "note": "Knotweed/2 at (4,7) blocks Rose/1 (4,5) from Jasmine/2 (4,11). A Wheel at (3,8) or (5,6) rotates it off row 4 (both legal without the Rose, verified); a Wheel at (3,6) moves it along row 4 to (4,6), which still blocks.",
+ "state": {"board": {"4,5": "Rose/1", "4,7": "Knotweed/2", "4,11": "Jasmine/2"}, "bonus_turn": true},
+ "checks": [{"legal_excludes": [["plant", "Wheel", 3, 8], ["plant", "Wheel", 5, 6]],
+             "legal_includes": [["plant", "Wheel", 3, 6]]}]}

@@ -5,11 +5,12 @@
 
 use crate::flower::{Color, Flower};
 
-/// The four accent tiles. They don't move via the orthogonal BFS movement
-/// system at all (`PaiShoGame.valid_destinations` returns `[]` immediately
-/// for any tile in `ACCENT_TILES`) — each instead has its own one-shot
-/// placement effect (Wheel rotates neighbors, Boat displaces an enemy tile,
-/// etc.), implemented in a later milestone once there's a board to act on.
+/// The four accent tiles. They never arrange (`valid_destinations` is empty
+/// for them); each has a placement effect instead, applied in
+/// `Board::place_accent`: Rock and Knotweed just sit on the board, a Wheel
+/// rotates its 8 neighbours one step clockwise, and a Boat displaces a
+/// blooming flower of either player to a surrounding point, or removes an
+/// accent tile together with itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AccentTile {
     Rock,
@@ -86,6 +87,10 @@ impl Tile {
 /// `for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]` loop in
 /// `PaiShoGame.valid_destinations`.
 pub const ORTHOGONAL_OFFSETS: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+
+/// The 8 surrounding points, starting North and going clockwise — the Wheel's
+/// rotation ring (rulebook p.10). Same order as `_NEIGHBOURS_8` in PaiShoGame.py.
+pub const NEIGHBOURS_8: [(i32, i32); 8] = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1)];
 
 #[cfg(test)]
 mod tests {

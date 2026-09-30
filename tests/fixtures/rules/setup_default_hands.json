@@ -1,0 +1,7 @@
+{"name": "setup_default_hands", "ref": "PDF p.6 tiles; p.8 beginner tip one of each accent",
+ "setup": {"opening": null},
+ "checks": [{"expect": {"hands": {"1": {"Rose": 3, "Jade": 3, "Rock": 1, "Wheel": 1, "Knotweed": 1, "Boat": 1, "Orchid": 1, "WhiteLotus": 1},
+                                  "2": {"Rose": 3, "Lily": 3}},
+                        "board": {"17,9": null, "1,9": null},
+                        "setup": {"accents": {"1": ["Rock", "Wheel", "Knotweed", "Boat"], "2": ["Rock", "Wheel", "Knotweed", "Boat"]}, "opening": null},
+                        "current_player": 1, "end_reason": null}}]}

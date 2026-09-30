@@ -1,0 +1,7 @@
+{"name": "setup_formal_opening", "ref": "PDF p.8 Beginning the Game",
+ "setup": {"opening": "Rose"},
+ "checks": [{"expect": {"board": {"17,9": "Rose/1/g", "1,9": "Rose/2/g", "9,1": null, "9,17": null},
+                        "hands": {"1": {"Rose": 2, "Jasmine": 3}, "2": {"Rose": 2}},
+                        "current_player": 1,
+                        "setup": {"accents": {"1": ["Rock", "Wheel", "Knotweed", "Boat"], "2": ["Rock", "Wheel", "Knotweed", "Boat"]}, "opening": "Rose"}}},
+            {"legal_includes": [["plant", "Jasmine", 9, 1], ["arrange", 17, 9, 16, 9]]}]}

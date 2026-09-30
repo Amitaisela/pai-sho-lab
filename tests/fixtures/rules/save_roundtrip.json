@@ -1,0 +1,6 @@
+{"name": "save_roundtrip", "ref": "save format v2 keeps setup and end_reason",
+ "setup": {"opening": "Rose", "accents": {"1": ["Rock", "Rock", "Boat", "Boat"], "2": ["Rock", "Wheel", "Knotweed", "Boat"]}},
+ "checks": [{"step": ["plant", "Jasmine", 9, 1]},
+            {"save_roundtrip": true},
+            {"resign": 2},
+            {"save_roundtrip": true}]}

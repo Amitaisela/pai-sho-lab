@@ -30,6 +30,7 @@ _state = {
     "p1_wins": 0,
     "p2_wins": 0,
     "draws": 0,
+    "timeouts": 0,
     "log_lines": [],
     "log_seq": 0,
     "start_time": None,
@@ -80,12 +81,17 @@ def _reader_thread(process):
                         _state["p1_wins"] += 1
                     elif winner == 2:
                         _state["p2_wins"] += 1
-                    else:
+                    elif winner == 0:
                         _state["draws"] += 1
-                        winner = None
-                    if _state.get("rated") and _state.get("p1_key") and _state.get("p2_key"):
+                    else:
+                        # winner is None: the game timed out rather than ending in a
+                        # tie. Counted separately and never Elo-rated - a timeout
+                        # isn't a real result for either agent.
+                        _state["timeouts"] += 1
+                    if winner in (1, 2, 0) and _state.get("rated") and _state.get("p1_key") and _state.get("p2_key"):
+                        rated_winner = None if winner == 0 else winner
                         try:
-                            res = elo.record_game(_state["p1_key"], _state["p2_key"], winner)
+                            res = elo.record_game(_state["p1_key"], _state["p2_key"], rated_winner)
                             if res:
                                 res["game"] = _state["current_game"]
                                 _state["p1_elo"] = res["p1_after"]
@@ -204,6 +210,7 @@ def start_simulation(p1_model, p1_params, p2_model, p2_params,
             "p1_wins": 0,
             "p2_wins": 0,
             "draws": 0,
+            "timeouts": 0,
             "log_lines": [cmd_line],
             "log_seq": 1,
             "start_time": time.time(),
@@ -272,6 +279,7 @@ def get_status():
             "p1_wins": _state["p1_wins"],
             "p2_wins": _state["p2_wins"],
             "draws": _state["draws"],
+            "timeouts": _state.get("timeouts", 0),
             "log_lines": list(_state["log_lines"]),
             "log_seq": _state["log_seq"],
             "elapsed": elapsed,

@@ -4,6 +4,7 @@
 //! `ACCENT_TILES`, and `SPECIAL_TILES` literals exactly.
 
 use pai_sho_engine::flower::Flower;
+use pai_sho_engine::moves::EndReason;
 use pai_sho_engine::player::Player;
 use pai_sho_engine::tile::{AccentTile, SpecialTile, Tile};
 
@@ -78,6 +79,25 @@ pub fn player_from_int(i: i32) -> Option<Player> {
     match i {
         1 => Some(Player::One),
         2 => Some(Player::Two),
+        _ => None,
+    }
+}
+
+pub fn end_reason_name(r: EndReason) -> &'static str {
+    match r {
+        EndReason::Ring => "ring",
+        EndReason::LastBasicFlower => "last_basic_flower",
+        EndReason::NoMoves => "no_moves",
+        EndReason::Resign => "resign",
+    }
+}
+
+pub fn end_reason_from_name(name: &str) -> Option<EndReason> {
+    match name {
+        "ring" => Some(EndReason::Ring),
+        "last_basic_flower" => Some(EndReason::LastBasicFlower),
+        "no_moves" => Some(EndReason::NoMoves),
+        "resign" => Some(EndReason::Resign),
         _ => None,
     }
 }

@@ -15,14 +15,14 @@ use crate::flower::{is_clash, is_harmonious, Flower};
 use crate::game::{clear_line_between, Board};
 use crate::piece::Piece;
 use crate::player::Player;
-use crate::tile::{AccentTile, SpecialTile, Tile};
+use crate::tile::{AccentTile, SpecialTile, Tile, NEIGHBOURS_8};
 
 impl Board {
     /// All harmony pairs among `player`'s own non-growing circle flowers,
     /// plus every non-growing circle flower of `player`'s paired with any
     /// non-growing White Lotus tile on the board (either player's) it
-    /// shares a row/column with. A `Rock` tile excludes every tile sharing
-    /// its row or column from participating at all (owner-independent); a
+    /// shares a row/column with. A `Rock` tile cancels any harmony that
+    /// would lie along its row or column (owner-independent); a
     /// `Knotweed` tile excludes every tile in its 8 surrounding cells.
     /// Ported from `PaiShoGame.find_harmonies` (the `custom_board=None`,
     /// caching path is dropped — see this plan's Global Constraints).
@@ -30,7 +30,6 @@ impl Board {
         let mut rock_rows: HashSet<i32> = HashSet::new();
         let mut rock_cols: HashSet<i32> = HashSet::new();
         let mut drained: HashSet<Position> = HashSet::new();
-
         for (&pos, piece) in &self.pieces {
             match piece.tile {
                 Tile::Accent(AccentTile::Rock) => {
@@ -38,75 +37,54 @@ impl Board {
                     rock_cols.insert(pos.col);
                 }
                 Tile::Accent(AccentTile::Knotweed) => {
-                    for dr in -1..=1 {
-                        for dc in -1..=1 {
-                            if dr != 0 || dc != 0 {
-                                drained.insert(Position::new(pos.row + dr, pos.col + dc));
-                            }
-                        }
+                    for (dr, dc) in NEIGHBOURS_8 {
+                        drained.insert(Position::new(pos.row + dr, pos.col + dc));
                     }
                 }
                 _ => {}
             }
         }
-
-        let rock_affected = |pos: Position| rock_rows.contains(&pos.row) || rock_cols.contains(&pos.col);
+        let in_harmony = |a: Position, b: Position| -> bool {
+            if a.row != b.row && a.col != b.col {
+                return false;
+            }
+            if (a.row == b.row && rock_rows.contains(&a.row)) || (a.col == b.col && rock_cols.contains(&a.col)) {
+                return false;
+            }
+            clear_line_between(&self.pieces, a, b)
+        };
 
         let owned: Vec<(Position, Flower)> = self
             .pieces
             .iter()
-            .filter_map(|(&pos, piece)| {
-                if piece.player == player && !piece.growing && !drained.contains(&pos) && !rock_affected(pos) {
-                    if let Tile::Flower(f) = piece.tile {
-                        return Some((pos, f));
-                    }
-                }
-                None
+            .filter_map(|(&pos, p)| match p.tile {
+                Tile::Flower(f) if p.player == player && !p.growing && !drained.contains(&pos) => Some((pos, f)),
+                _ => None,
             })
             .collect();
-
-        let mut result: Vec<(Position, Position)> = Vec::new();
+        let mut result = Vec::new();
         for i in 0..owned.len() {
             for j in (i + 1)..owned.len() {
                 let (p1, f1) = owned[i];
                 let (p2, f2) = owned[j];
-                if (p1.row == p2.row || p1.col == p2.col)
-                    && is_harmonious(f1, f2)
-                    && clear_line_between(&self.pieces, p1, p2)
-                {
+                if is_harmonious(f1, f2) && in_harmony(p1, p2) {
                     result.push((p1, p2));
                 }
             }
         }
-
-        let wl_tiles: Vec<Position> = self
+        let lotuses: Vec<Position> = self
             .pieces
             .iter()
-            .filter_map(|(&pos, piece)| {
-                if piece.tile == Tile::Special(SpecialTile::WhiteLotus)
-                    && !piece.growing
-                    && !drained.contains(&pos)
-                    && !rock_affected(pos)
-                {
-                    Some(pos)
-                } else {
-                    None
-                }
-            })
+            .filter(|(pos, p)| p.tile == Tile::Special(SpecialTile::WhiteLotus) && !p.growing && !drained.contains(pos))
+            .map(|(&pos, _)| pos)
             .collect();
-
-        for &(pos_f, _) in &owned {
-            for &pos_wl in &wl_tiles {
-                if (pos_f.row == pos_wl.row || pos_f.col == pos_wl.col) && clear_line_between(&self.pieces, pos_f, pos_wl) {
-                    let pair = (pos_f, pos_wl);
-                    let reversed = (pos_wl, pos_f);
-                    if !result.contains(&pair) && !result.contains(&reversed) {
-                        result.push(pair);
-                    }
+        for &(p1, _) in &owned {
+            for &p2 in &lotuses {
+                if in_harmony(p1, p2) {
+                    result.push((p1, p2));
                 }
             }
         }
-
         result
     }
 
@@ -125,48 +103,30 @@ impl Board {
     pub fn count_midline_harmonies(&self, player: Player) -> i32 {
         let mid = RADIUS;
         let mut count = 0;
-        for (p1, p2) in self.find_harmonies(player) {
-            let crosses_row_midline = p1.row == p2.row && p1.col.min(p2.col) < mid && mid < p1.col.max(p2.col);
-            let crosses_col_midline = p1.col == p2.col && p1.row.min(p2.row) < mid && mid < p1.row.max(p2.row);
-            if crosses_row_midline || crosses_col_midline {
+        for (a, b) in self.find_harmonies(player) {
+            if [a.row, a.col, b.row, b.col].contains(&mid) {
+                continue;
+            }
+            if (a.row < mid) != (b.row < mid) || (a.col < mid) != (b.col < mid) {
                 count += 1;
             }
         }
         count
     }
 
-    /// True if `player` has 4 or more harmonies whose positions form a
-    /// cycle enclosing the board center. Ported from
-    /// `PaiShoGame.check_harmony_ring`.
+    /// A chain of `player`'s harmonies surrounding the center without touching it.
+    /// Ported from `PaiShoGame.check_harmony_ring`.
     pub fn check_harmony_ring(&self, player: Player) -> bool {
-        let harmonies = self.find_harmonies(player);
-        if harmonies.len() < 4 {
-            return false;
-        }
-
-        let mut adjacency: HashMap<Position, Vec<Position>> = HashMap::new();
-        for &(p1, p2) in &harmonies {
-            adjacency.entry(p1).or_default().push(p2);
-            adjacency.entry(p2).or_default().push(p1);
-        }
-
-        let mut found = false;
-        for &start in adjacency.keys().collect::<Vec<_>>().iter().copied() {
-            if found {
-                break;
-            }
-            let mut path = vec![start];
-            let mut visited: HashSet<Position> = HashSet::from([start]);
-            ring_dfs(&adjacency, start, start, &mut path, &mut visited, &mut found);
-        }
-        found
+        let edges: Vec<(Position, Position)> =
+            self.find_harmonies(player).into_iter().filter(|&(a, b)| !segment_touches_center(a, b)).collect();
+        has_odd_cycle(&edges)
     }
 }
 
 /// Whole-board clash scan over an arbitrary board snapshot (not necessarily
-/// the live `Board`) — Task 7 needs this to check a hypothetical
-/// post-rotation board before committing to it. Ported from
-/// `PaiShoGame.find_clashes`.
+/// the live `Board`), used to vet hypothetical boards after a Wheel rotation
+/// or a Boat placement before offering them. Ported from
+/// `PaiShoGame.find_clashes(custom_board=...)`.
 pub(crate) fn find_clashes_on(pieces: &HashMap<Position, Piece>) -> Vec<(Position, Position)> {
     let items: Vec<(Position, Piece)> = pieces.iter().map(|(&pos, &piece)| (pos, piece)).collect();
     let mut result = Vec::new();
@@ -192,70 +152,50 @@ pub(crate) fn find_clashes_on(pieces: &HashMap<Position, Piece>) -> Vec<(Positio
     result
 }
 
-/// Even-odd ray-casting point-in-polygon test: does the closed path
-/// `cycle` (each consecutive pair, including the wraparound last-to-first
-/// edge, treated as a polygon edge) enclose the board center? Ported from
-/// `PaiShoGame.check_harmony_ring`'s nested `enclosed` closure. Uses
-/// `Position.col` as the x-axis and `Position.row` as the y-axis, matching
-/// Python's `x1, y1 = cycle[j][1], cycle[j][0]`.
-fn ring_encloses_center(cycle: &[Position]) -> bool {
-    let cx = RADIUS as f64;
-    let cy = RADIUS as f64;
-    let n = cycle.len();
-    let mut inside = false;
-    let mut j = n - 1;
-    for i in 0..n {
-        let (x1, y1) = (cycle[j].col as f64, cycle[j].row as f64);
-        let (x2, y2) = (cycle[i].col as f64, cycle[i].row as f64);
-        if (y1 > cy) != (y2 > cy) {
-            let x_intersect = x1 + (cy - y1) * (x2 - x1) / (y2 - y1);
-            if cx < x_intersect {
-                inside = !inside;
-            }
-        }
-        j = i;
-    }
-    inside
+fn segment_touches_center(a: Position, b: Position) -> bool {
+    let m = RADIUS;
+    (a.row == m && b.row == m && a.col.min(b.col) <= m && m <= a.col.max(b.col))
+        || (a.col == m && b.col == m && a.row.min(b.row) <= m && m <= a.row.max(b.row))
 }
 
-/// Depth-first search for a cycle of length >= 4 back to `start`, capped at
-/// path length 10 (matches Python's `len(path) > 10` guard). Every cycle
-/// found is tested with `ring_encloses_center`; `found` is set and search
-/// stops as soon as one qualifies. Ported from `PaiShoGame.check_harmony_ring`'s
-/// nested `dfs` closure.
-fn ring_dfs(
-    adjacency: &HashMap<Position, Vec<Position>>,
-    start: Position,
-    current: Position,
-    path: &mut Vec<Position>,
-    visited: &mut HashSet<Position>,
-    found: &mut bool,
-) {
-    if *found || path.len() > 10 {
-        return;
+/// 1 if segment a-b crosses the ray y = 9 + epsilon, x > 9. Ported from `_ray_parity`.
+fn ray_parity(a: Position, b: Position) -> u8 {
+    if a.col != b.col || a.col <= RADIUS {
+        return 0;
     }
-    let neighbors = match adjacency.get(&current) {
-        Some(n) => n.clone(),
-        None => return,
-    };
-    for neighbor in neighbors {
-        if neighbor == start && path.len() >= 4 {
-            if ring_encloses_center(path) {
-                *found = true;
-            }
-            return;
+    u8::from(a.row.min(b.row) <= RADIUS && RADIUS < a.row.max(b.row))
+}
+
+/// Weighted union-find over GF(2) crossing parity; ported from `_has_odd_cycle`.
+fn has_odd_cycle(edges: &[(Position, Position)]) -> bool {
+    let mut parent: HashMap<Position, Position> = HashMap::new();
+    let mut parity: HashMap<Position, u8> = HashMap::new();
+    fn find(parent: &HashMap<Position, Position>, parity: &HashMap<Position, u8>, mut x: Position) -> (Position, u8) {
+        let mut p = 0;
+        while parent[&x] != x {
+            p ^= parity[&x];
+            x = parent[&x];
         }
-        if !visited.contains(&neighbor) {
-            visited.insert(neighbor);
-            path.push(neighbor);
-            ring_dfs(adjacency, start, neighbor, path, visited, found);
-            path.pop();
-            visited.remove(&neighbor);
-            if *found {
-                return;
+        (x, p)
+    }
+    for &(a, b) in edges {
+        for v in [a, b] {
+            parent.entry(v).or_insert(v);
+            parity.entry(v).or_insert(0);
+        }
+        let (ra, pa) = find(&parent, &parity, a);
+        let (rb, pb) = find(&parent, &parity, b);
+        let w = ray_parity(a, b);
+        if ra == rb {
+            if pa ^ pb ^ w == 1 {
+                return true;
             }
+        } else {
+            parent.insert(ra, rb);
+            parity.insert(ra, pa ^ pb ^ w);
         }
     }
+    false
 }
 
 #[cfg(test)]
@@ -442,5 +382,14 @@ mod tests {
         board.pieces.insert(Position::new(5, 13), piece(Tile::Special(SpecialTile::WhiteLotus), Player::One));
         board.pieces.insert(Position::new(13, 13), piece(Tile::Flower(Flower::Jasmine), Player::One));
         assert!(!board.check_harmony_ring(Player::One));
+    }
+
+    #[test]
+    fn square_around_center_is_a_ring_and_square_beside_it_is_not() {
+        let p = Position::new;
+        let around = [(p(3, 6), p(3, 12)), (p(3, 12), p(15, 12)), (p(15, 12), p(15, 6)), (p(15, 6), p(3, 6))];
+        assert!(has_odd_cycle(&around));
+        let beside = [(p(3, 10), p(3, 14)), (p(3, 14), p(15, 14)), (p(15, 14), p(15, 10)), (p(15, 10), p(3, 10))];
+        assert!(!has_odd_cycle(&beside));
     }
 }

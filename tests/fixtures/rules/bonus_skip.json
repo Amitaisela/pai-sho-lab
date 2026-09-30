@@ -1,0 +1,6 @@
+{"name": "bonus_skip", "ref": "PDF p.8 you may do one Harmony Bonus action (optional)",
+ "state": {"board": {"12,4": "Rose/1", "12,8": "Chrysanthemum/1", "15,2": "Chrysanthemum/1"}},
+ "checks": [{"step": ["arrange", 12, 4, 15, 4], "expect": {"bonus_turn": true, "current_player": 1}},
+            {"legal_includes": [["skip_bonus"], ["plant", "Rock", 5, 5]]},
+            {"step": ["skip_bonus"], "expect": {"bonus_turn": false, "current_player": 2}},
+            {"legal_excludes": [["skip_bonus"]]}]}

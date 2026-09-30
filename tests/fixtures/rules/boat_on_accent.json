@@ -1,0 +1,4 @@
+{"name": "boat_on_accent", "ref": "PDF p.10 Boat on an Accent Tile: both removed",
+ "state": {"board": {"12,14": "Rock/2"}, "bonus_turn": true},
+ "checks": [{"legal_includes": [["plant", "Boat", 12, 14]]},
+            {"step": ["plant", "Boat", 12, 14], "expect": {"board": {"12,14": null}, "hands": {"1": {"Boat": 0}}}}]}

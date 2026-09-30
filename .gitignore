@@ -3,15 +3,16 @@ logs/
 data/checkpoints
 engine/RustEngine/target/
 docs/
-elo_history.json
-elo_ratings.json
+data/elo/
+/elo_*.json
 future.txt
 *_results.csv
 *.pkl
 *.pt
 *.npz
 thoughts.txt
-.claude
+.claude/*
+!.claude/skills/
 CLAUDE.md
 .idea/
 # Byte-compiled / optimized / DLL files
@@ -219,3 +220,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Official rulebook PDF (third-party; not redistributed)
+SkudPaiShoRules_*.pdf

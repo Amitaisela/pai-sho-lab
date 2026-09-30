@@ -1,0 +1,5 @@
+{"name": "no_stranding", "ref": "rules page: you may not make a move that leaves your opponent with no possible moves",
+ "state": {"board": {"1,9": "Rose/2/g", "1,8": "Chrysanthemum/1", "1,10": "Rhododendron/1", "2,9": "Lily/1",
+                     "17,9": "Rose/1/g", "9,17": "Chrysanthemum/1/g"}},
+ "checks": [{"legal_excludes": [["plant", "Jasmine", 9, 1], ["plant", "Rose", 9, 1]],
+             "legal_includes": [["arrange", 2, 9, 3, 9]]}]}

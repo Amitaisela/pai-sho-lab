@@ -1,0 +1,2 @@
+{"name": "setup_from_dict_rejects_bad_opening", "ref": "engine contract: saves store a concrete opening",
+ "state": {"board": {}}, "setup": {"opening": "random"}, "constructor_raises": true}

@@ -1,0 +1,3 @@
+{"name": "capture_vulnerable_orchid_by_lotus", "ref": "PDF p.12 wild Orchid can be captured by any opposing Flower Tile",
+ "state": {"board": {"12,13": "WhiteLotus/1", "12,15": "Orchid/2", "15,4": "WhiteLotus/2"}},
+ "checks": [{"destinations_include": {"12,13": [[12,15]]}}]}

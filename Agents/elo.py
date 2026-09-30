@@ -6,11 +6,13 @@ import time
 from Agents.registry import get_agent
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-RATINGS_PATH = os.path.join(PROJECT_ROOT, 'elo_ratings.json')
-HISTORY_PATH = os.path.join(PROJECT_ROOT, 'elo_history.json')
+ELO_DIR = os.path.join(PROJECT_ROOT, 'data', 'elo')
+RATINGS_PATH = os.path.join(ELO_DIR, 'elo_ratings.json')
+HISTORY_PATH = os.path.join(ELO_DIR, 'elo_history.json')
 
 DEFAULT_RATING = 1200
 K = 32
+RULES_VERSION = 2  # bump when the game's rules change; ratings from older rules are archived once
 
 _lock = threading.Lock()
 
@@ -43,10 +45,21 @@ def _file_mtime(path):
 
 
 def _atomic_write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + '.tmp'
     with open(tmp, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
     os.replace(tmp, path)
+
+
+def _migrate_legacy_files():
+    """Move pre-0b root-level Elo files into data/elo once (data/ is what Docker persists).
+    Must be called from inside `_lock`."""
+    for name, dest in (('elo_ratings.json', RATINGS_PATH), ('elo_history.json', HISTORY_PATH)):
+        legacy = os.path.join(PROJECT_ROOT, name)
+        if os.path.exists(legacy) and not os.path.exists(dest):
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            os.replace(legacy, dest)
 
 
 def _load_ratings():
@@ -174,8 +187,29 @@ def _ensure_record(ratings, agent_key):
         _check_and_reset(ratings, agent_key)
 
 
+def _ensure_rules_version():
+    """Archive and reset every rating once per rules version (ratings earned under
+    different rules aren't comparable). Idempotent: a marker in the history records it.
+    Must be called from inside `_lock`."""
+    history = _load_history()
+    if any(h.get('agent') == '__rules_version__' and h.get('rules_version') == RULES_VERSION for h in history):
+        return
+    ratings = _load_ratings()
+    now = time.time()
+    for key, rec in ratings.items():
+        _append_history({
+            'agent': key, 'rating': rec.get('rating', DEFAULT_RATING), 'games': rec.get('games', 0),
+            'wins': rec.get('wins', 0), 'losses': rec.get('losses', 0), 'draws': rec.get('draws', 0),
+            'archived_at': now, 'reason': f'rules_v{RULES_VERSION}',
+        })
+    _save_ratings({})
+    _append_history({'agent': '__rules_version__', 'rules_version': RULES_VERSION, 'archived_at': now})
+
+
 def get_rating(agent_key):
     with _lock:
+        _migrate_legacy_files()
+        _ensure_rules_version()
         ratings = _load_ratings()
         _ensure_record(ratings, agent_key)
         _save_ratings(ratings)
@@ -191,6 +225,8 @@ def record_game(p1_key, p2_key, winner):
     if not p1_key or not p2_key:
         return None
     with _lock:
+        _migrate_legacy_files()
+        _ensure_rules_version()
         ratings = _load_ratings()
         _ensure_record(ratings, p1_key)
         _ensure_record(ratings, p2_key)
@@ -240,6 +276,8 @@ def record_game(p1_key, p2_key, winner):
 
 def get_leaderboard(include_humans=True, include_bots=True):
     with _lock:
+        _migrate_legacy_files()
+        _ensure_rules_version()
         ratings = _load_ratings()
         dirty = False
         for key in list(ratings.keys()):
@@ -273,4 +311,7 @@ def get_leaderboard(include_humans=True, include_bots=True):
 
 def get_history():
     with _lock:
-        return _load_history()
+        _migrate_legacy_files()
+        _ensure_rules_version()
+        history = _load_history()
+        return [h for h in history if h.get('agent') != '__rules_version__']

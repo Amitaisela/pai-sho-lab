@@ -1,0 +1,5 @@
+{"name": "resign", "ref": "PDF p.15 Forfeit",
+ "setup": {"opening": null},
+ "checks": [{"resign": 1, "expect": {"winner": 2, "end_reason": "resign"}},
+            {"legal_count": 0},
+            {"step": ["plant", "Rose", 9, 1], "raises": true}]}

@@ -1,0 +1,3 @@
+{"name": "movement_gate_passage", "ref": "PDF p.9 R4 example: may move through a Gate but not onto it",
+ "state": {"board": {"1,7": "Rhododendron/1"}},
+ "checks": [{"destinations_include": {"1,7": [[1,10], [1,11]]}, "destinations_exclude": {"1,7": [[1,9]]}}]}

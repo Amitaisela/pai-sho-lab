@@ -1,0 +1,4 @@
+{"name": "setup_accent_choice", "ref": "PDF p.8 each player chooses 4 accents",
+ "setup": {"opening": null, "accents": {"1": ["Boat", "Rock", "Boat", "Rock"], "2": ["Knotweed", "Wheel", "Wheel", "Knotweed"]}},
+ "checks": [{"expect": {"hands": {"1": {"Rock": 2, "Boat": 2, "Wheel": 0, "Knotweed": 0}, "2": {"Rock": 0, "Boat": 0, "Wheel": 2, "Knotweed": 2}},
+                        "setup": {"accents": {"1": ["Rock", "Rock", "Boat", "Boat"], "2": ["Wheel", "Wheel", "Knotweed", "Knotweed"]}, "opening": null}}}]}

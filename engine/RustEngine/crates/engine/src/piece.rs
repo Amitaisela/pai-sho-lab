@@ -1,6 +1,7 @@
 //! A tile occupying a board cell: which kind, who owns it, and whether it's
-//! still "growing" — freshly planted this turn, not yet eligible to be the
-//! *source* of an `arrange` move during a bonus turn (see `game::Board`).
+//! "growing" — planted in a gate and not yet arranged out of it (growing ⇔ on
+//! a gate). Growing tiles form no harmonies or clashes and can't be captured
+//! or targeted by a Boat.
 //! Ported from `PaiShoGame.py`'s per-cell dict:
 //! `{'flower': ..., 'player': ..., 'growing': ...}`.
 

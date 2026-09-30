@@ -27,6 +27,10 @@ pub const GATES: [Position; 4] = [
     Position::new(RADIUS, BOARD_SIZE - 2),
 ];
 
+/// Player One (the Guest, who moves first) starts in this gate; Player Two (the Host) in `HOST_GATE`.
+pub const GUEST_GATE: Position = Position::new(BOARD_SIZE - 2, RADIUS);
+pub const HOST_GATE: Position = Position::new(1, RADIUS);
+
 /// The four cells directly behind each gate. Off-board except by crossing
 /// through the corresponding gate.
 pub const BEHIND_GATES: [Position; 4] = [

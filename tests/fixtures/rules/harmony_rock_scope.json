@@ -1,0 +1,3 @@
+{"name": "harmony_rock_scope", "ref": "PDF p.10 Rock: cancels harmonies along its lines",
+ "state": {"board": {"12,2": "Rock/2", "12,4": "Rose/1", "15,4": "Chrysanthemum/1"}},
+ "checks": [{"expect": {"harmonies": {"1": [[[12,4],[15,4]]]}}}]}

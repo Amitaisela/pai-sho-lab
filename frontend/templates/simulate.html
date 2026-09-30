@@ -479,7 +479,7 @@ function updateDashboard(data) {
 function renderStats(data) {
     if (data.p1_elo != null) document.getElementById('p1-elo').textContent = 'ELO: ' + data.p1_elo;
     if (data.p2_elo != null) document.getElementById('p2-elo').textContent = 'ELO: ' + data.p2_elo;
-    const played = (data.p1_wins || 0) + (data.p2_wins || 0) + (data.draws || 0);
+    const played = (data.p1_wins || 0) + (data.p2_wins || 0) + (data.draws || 0) + (data.timeouts || 0);
     const rate = (v) => played > 0 ? ((v / played) * 100).toFixed(1) + '%' : '--';
     const avg = played > 0 && data.elapsed
         ? (data.elapsed / played).toFixed(2) + 's'
@@ -489,6 +489,7 @@ function renderStats(data) {
         { label: 'P1 Wins', value: `${data.p1_wins || 0} (${rate(data.p1_wins || 0)})` },
         { label: 'P2 Wins', value: `${data.p2_wins || 0} (${rate(data.p2_wins || 0)})` },
         { label: 'Draws', value: `${data.draws || 0} (${rate(data.draws || 0)})` },
+        { label: 'Timeouts', value: `${data.timeouts || 0} (${rate(data.timeouts || 0)})` },
         { label: 'Avg Game Time', value: avg },
         { label: 'Elapsed', value: data.elapsed !== null && data.elapsed !== undefined ? formatElapsed(data.elapsed) : '--' },
     ];

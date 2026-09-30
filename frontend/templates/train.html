@@ -848,38 +848,9 @@ function renderStats(data) {
     const s = data.parsed_stats || {};
     let cards = [];
 
-    if (data.model === 'monte_carlo') {
-        cards = [
-            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
-            { label: 'Q-Table Size', value: s.q_table_size !== undefined ? s.q_table_size.toLocaleString() : '--' },
-            { label: 'Last Outcome', value: s.outcome || '--' },
-            { label: 'Steps', value: s.steps !== undefined ? s.steps.toLocaleString() : '--' },
-            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
-            { label: 'Q-Table Delta', value: s.q_table_delta || '--' },
-        ];
-    } else if (data.model === 'td_learning') {
-        cards = [
-            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
-            { label: 'P1 Wins', value: s.p1_wins !== undefined ? s.p1_wins : '--' },
-            { label: 'P2 Wins', value: s.p2_wins !== undefined ? s.p2_wins : '--' },
-            { label: 'Draws', value: s.draws !== undefined ? s.draws : '--' },
-            { label: 'Last Outcome', value: s.outcome || '--' },
-            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
-        ];
-    } else if (data.model === 'neat') {
+    if (data.model === 'neat') {
         cards = [
             { label: 'Generation', value: s.episode !== undefined ? s.episode : '--' },
-        ];
-    } else if (data.model === 'ppo' || data.model === 'set_transformer') {
-        cards = [
-            { label: 'Epsilon', value: s.epsilon !== undefined ? s.epsilon.toFixed(4) : '--' },
-            { label: 'P1 Wins', value: s.p1_wins !== undefined ? s.p1_wins : '--' },
-            { label: 'P2 Wins', value: s.p2_wins !== undefined ? s.p2_wins : '--' },
-            { label: 'Draws', value: s.draws !== undefined ? s.draws : '--' },
-            { label: 'Policy Loss', value: s.policy_loss !== undefined ? s.policy_loss.toFixed(4) : '--' },
-            { label: 'Value Loss', value: s.value_loss !== undefined ? s.value_loss.toFixed(4) : '--' },
-            { label: 'Last Outcome', value: s.outcome || '--' },
-            { label: 'Episode Time', value: s.episode_time !== undefined ? s.episode_time.toFixed(2) + 's' : '--' },
         ];
     } else if (data.model === 'nneu_basic') {
         const phaseLabel = s.phase === 'generate' ? 'Generate' :

@@ -1,0 +1,5 @@
+{"name": "boat_on_accent_uncovers_clash", "ref": "spec §2.5/§2.9: a Boat on an accent may not uncover a clash",
+ "note": "The Rock at (4,8) is the only thing between Rose/1 (4,5) and Jasmine/2 (4,11); a Boat on it removes both and leaves them facing each other. The Boat on the Knotweed elsewhere uncovers nothing and stays legal.",
+ "state": {"board": {"4,5": "Rose/1", "4,8": "Rock/2", "4,11": "Jasmine/2", "14,9": "Lily/1", "12,14": "Knotweed/2"},
+           "bonus_turn": true},
+ "checks": [{"legal_excludes": [["plant", "Boat", 4, 8]], "legal_includes": [["plant", "Boat", 12, 14]]}]}

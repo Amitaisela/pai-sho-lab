@@ -1,0 +1,4 @@
+{"name": "bonus_new_pair_same_count", "ref": "PDF p.8 a new Harmony earns the bonus",
+ "state": {"board": {"12,4": "Rose/1", "12,8": "Chrysanthemum/1", "15,2": "Chrysanthemum/1"}},
+ "checks": [{"expect": {"harmonies": {"1": [[[12,4],[12,8]]]}}},
+            {"step": ["arrange", 12, 4, 15, 4], "expect": {"harmonies": {"1": [[[15,2],[15,4]]]}, "bonus_turn": true, "current_player": 1}}]}

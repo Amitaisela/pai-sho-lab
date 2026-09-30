@@ -46,25 +46,7 @@ for _a in trainable_agents():
 _MAX_LOG_LINES = 500
 
 
-_RE_MC = re.compile(
-    r"Episode ([\d,]+)/([\d,]+) \| Eps: ([\d.]+) \| (.+?) in ([\d,]+) steps \| "
-    r"Q-Table: ([\d,]+) \(([^)]+)\) \| Took ([\d.]+)s"
-)
-_RE_TD = re.compile(
-    r"Episode ([\d,]+)/([\d,]+) \| "
-    r"eps=([\d.]+) \| (.+?) in (\d+) steps \| "
-    r"W1=(\d+) W2=(\d+) D=(\d+) \| "
-    r"([\d.]+)s"
-)
 _RE_NEAT_GEN = re.compile(r"Generation\s+(\d+)", re.IGNORECASE)
-_RE_PPO = re.compile(
-    r"Episode ([\d,]+)/([\d,]+) \| "
-    r"eps=([\d.]+) \| (.+?) in (\d+) steps \| "
-    r"W1=(\d+) W2=(\d+) D=(\d+) \| "
-    r"PL=([\d.]+) VL=([\d.]+) \| "
-    r"params=([\d,]+) \| "
-    r"([\d.]+)s"
-)
 _RE_BASIC_MINIMAX = re.compile(
     r"Episode ([\d,]+)/([\d,]+) \| "
     r"eps=([\d.]+) \| (.+?) in (\d+) steps \| "
@@ -74,49 +56,8 @@ _RE_BASIC_MINIMAX = re.compile(
 )
 
 
-def _extract_mc(m):
-    return {
-        "episode": int(m.group(1).replace(",", "")),
-        "total": int(m.group(2).replace(",", "")),
-        "epsilon": float(m.group(3)),
-        "outcome": m.group(4),
-        "steps": int(m.group(5).replace(",", "")),
-        "q_table_size": int(m.group(6).replace(",", "")),
-        "q_table_delta": m.group(7).strip(),
-        "episode_time": float(m.group(8)),
-    }
-
-def _extract_td(m):
-    return {
-        "episode": int(m.group(1).replace(",", "")),
-        "total": int(m.group(2).replace(",", "")),
-        "epsilon": float(m.group(3)),
-        "outcome": m.group(4),
-        "steps": int(m.group(5)),
-        "p1_wins": int(m.group(6)),
-        "p2_wins": int(m.group(7)),
-        "draws": int(m.group(8)),
-        "episode_time": float(m.group(9)),
-    }
-
 def _extract_neat(m):
     return {"episode": int(m.group(1))}
-
-def _extract_ppo(m):
-    return {
-        "episode": int(m.group(1).replace(",", "")),
-        "total": int(m.group(2).replace(",", "")),
-        "epsilon": float(m.group(3)),
-        "outcome": m.group(4),
-        "steps": int(m.group(5)),
-        "p1_wins": int(m.group(6)),
-        "p2_wins": int(m.group(7)),
-        "draws": int(m.group(8)),
-        "policy_loss": float(m.group(9)),
-        "value_loss": float(m.group(10)),
-        "params": int(m.group(11).replace(",", "")),
-        "episode_time": float(m.group(12)),
-    }
 
 def _extract_basic_minimax(m):
     return {
@@ -134,10 +75,7 @@ def _extract_basic_minimax(m):
     }
 
 _LOG_PARSERS = {
-    "monte_carlo":   (_RE_MC, _extract_mc),
-    "td_learning":   (_RE_TD, _extract_td),
     "neat":          (_RE_NEAT_GEN, _extract_neat),
-    "ppo":           (_RE_PPO, _extract_ppo),
     "basic_minimax": (_RE_BASIC_MINIMAX, _extract_basic_minimax),
 }
 

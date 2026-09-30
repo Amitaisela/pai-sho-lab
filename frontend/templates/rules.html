@@ -186,13 +186,14 @@
     <p class="subtitle">A two-player strategy game on a circular board. Plant flowers, form harmonies, and close a ring around the center to win.</p>
 
     <h2>The Goal</h2>
-    <p>Be the first player to form a <span class="highlight">Harmony Ring</span> — a connected chain of your own harmonies that fully encloses the center of the board. Two other endings exist (last basic flower planted, forfeit) and are covered below.</p>
+    <p>Be the first player to form a <span class="highlight">Harmony Ring</span> — a connected chain of your own harmonies that fully encloses the center of the board. Other endings exist (last basic flower planted, no legal move, resign) and are covered below.</p>
 
     <h2>The Board &amp; Your Tiles</h2>
     <ul>
-        <li>The board is a circle inside a 19×19 grid with four <strong>Gates</strong> on the cardinal edges (N, S, E, W). Flowers enter play through your Gates.</li>
-        <li>The playing surface is split into <strong>Red</strong>, <strong>White</strong>, and <strong>Neutral</strong> gardens. A red flower may only rest on red or neutral gardens; a white flower only on white or neutral. The center space itself cannot be occupied.</li>
-        <li>Each player's set contains six <strong>Basic Flowers</strong> (three red: Rose, Chrysanthemum, Rhododendron — three white: Jasmine, Lily, Jade), two <strong>Special Flowers</strong> (White Lotus, Orchid), and four <strong>Accent Tiles</strong> (Rock, Wheel, Knotweed, Boat).</li>
+        <li>The board is a circle inside a 19×19 grid with four <strong>Gates</strong> on the cardinal edges (N, S, E, W). Flowers enter play through your Gates. A tile may pass <em>through</em> an open Gate while moving, but a move may never end on one.</li>
+        <li>The playing surface is split into <strong>Red</strong>, <strong>White</strong>, and <strong>Neutral</strong> gardens. A red flower may not <em>end</em> a move on a white garden space, and a white flower may not end on a red one; passing through is fine. The center space itself cannot be occupied.</li>
+        <li>Each player's set contains <strong>3 of each Basic Flower</strong> (red: Rose R3, Chrysanthemum R4, Rhododendron R5 — white: Jasmine W3, Lily W4, Jade W5), <strong>1 White Lotus</strong> and <strong>1 Orchid</strong>, and <strong>4 chosen Accent Tiles</strong> out of 8 available (Rock, Wheel, Knotweed, Boat — up to 2 of any one type; the default choice is one of each).</li>
+        <li>The <strong>Guest</strong> (Player 1) moves first. To start, a basic flower begins growing in both players' Gates — or the game can start informally, with no tile pre-placed.</li>
     </ul>
 
     <h2>The Circle of Harmony</h2>
@@ -270,7 +271,7 @@
     <p>Harmonies belong to you and appear on the board as a coloured line linking the two tiles.</p>
 
     <h3>Harmony Bonus</h3>
-    <p>Whenever you <em>create a new harmony</em> on your turn (through a plant or an arrange), you immediately receive a <strong>bonus action</strong>: plant an accent tile from your reserve, <em>or</em> place one of your special flowers (White Lotus / Orchid) onto one of your Gates. You only get one bonus per new harmony created; forming multiple harmonies in one turn does <em>not</em> stack.</p>
+    <p>Whenever an Arrange <em>creates a new harmony</em> (a pair that wasn't in harmony before your move), you get <strong>one optional</strong> bonus action: place an accent tile from your reserve, plant a special flower (White Lotus / Orchid) onto an open Gate, or — only if none of your flowers are currently growing — plant a basic flower onto an open Gate. You may also skip the bonus. Forming several harmonies at once still earns only one bonus, and a bonus never earns another bonus.</p>
 
     <h2>Clashes</h2>
     <p>Two basic flowers <span class="clash-txt">clash</span> when they sit <strong>opposite</strong> each other on the Circle of Harmony (same number, opposite colour: Rose↔Jasmine, Chrysanthemum↔Lily, Rhododendron↔Jade). Clashing flowers <strong>cannot form a harmony</strong> on a line that runs through the other, regardless of who owns them.</p>
@@ -279,15 +280,15 @@
     <p>A <strong>clash trap</strong> happens when a flower ends up on a line with an opposing clash partner such that it can't move without colliding further. Use clashes to block your opponent's intended harmony lines.</p>
 
     <h2>Captures</h2>
-    <p>You may <strong>capture</strong> an opposing basic flower by ending a move on its space, but only if the captured flower is <em>not currently in a harmony</em>. Harmonised flowers are protected. Captured flowers are removed from the board and returned to the opposing player's reserve.</p>
+    <p>You may <strong>capture</strong> an opposing basic flower by landing on it if the two flowers <span class="clash-txt">clash</span>. A wild Orchid (see below) may capture any opposing flower tile, and a wild Orchid may itself be captured by any opposing flower tile. Accent tiles and growing (not-yet-blooming) tiles are never captured. Captured tiles are removed from the game for good — they do not return to a reserve.</p>
 
     <h2>Accent Tiles</h2>
     <p>Accent tiles are placed as a <strong>Harmony Bonus</strong>. Each accent has its own placement rules and effect:</p>
     <ul>
-        <li><strong>Rock</strong> — an immovable obstacle. Any flower on one of the four grid lines passing through the rock <em>cannot form harmonies along that line</em>. Cannot be placed on a gate or the center.</li>
-        <li><strong>Wheel</strong> — when placed, it rotates the eight surrounding tiles one step <em>clockwise</em> around it. Tiles that can't legally move stay put.</li>
-        <li><strong>Knotweed</strong> — disables harmonies for the eight flowers adjacent to it (including diagonals). It does not move them, only mutes them.</li>
-        <li><strong>Boat</strong> — placed <em>on top of</em> an existing flower or accent. When placed on a flower, you may move that flower to any legal space on the board. When placed on an accent, it simply removes it. The Boat is consumed afterwards.</li>
+        <li><strong>Rock</strong> — an immovable obstacle placed on an open point. It cancels harmonies (of either player) that run along its row or column. Cannot be placed on a Gate, and a Wheel can never move a Rock.</li>
+        <li><strong>Wheel</strong> — placed on an open point, never one that is next to a Rock. When placed, it rotates the eight surrounding tiles one step <em>clockwise</em> around it. The whole rotation must be fully legal — no tile may be pushed off the board, into a Gate, out of a Gate, into the wrong-coloured garden, or into a clash — otherwise the Wheel cannot be placed there at all.</li>
+        <li><strong>Knotweed</strong> — placed on an open point; it drains harmonies for any flower (of either player) on its 8 surrounding points. It does not move them, only mutes them.</li>
+        <li><strong>Boat</strong> — placed on any blooming flower or any accent tile, yours or your opponent's. On a flower, the Boat replaces it and the flower moves to one of the 8 surrounding empty points. On an accent, both the accent and the Boat are removed from the game, leaving the point open.</li>
     </ul>
 
     <h2>Special Flower Tiles</h2>
@@ -295,14 +296,15 @@
     <h3>White Lotus</h3>
     <p>Moves up to 2 spaces. The White Lotus may form a harmony with <em>any</em> basic flower on the same row/column (with nothing in between), regardless of whom the basic flower belongs to. A harmony that involves an opponent's basic flower still belongs to the owner of that basic flower — use carefully.</p>
     <h3>Orchid</h3>
-    <p>Moves up to 6 spaces — the longest range in the game. The Orchid <strong>traps</strong> every opposing basic flower on the four squares orthogonally adjacent to it (those flowers cannot move). While a blooming White Lotus is on the board, every Orchid temporarily becomes <em>wild</em>: it can stand on any garden colour.</p>
+    <p>Moves up to 6 spaces — the longest range in the game. The Orchid <strong>traps</strong> the opponent's flower tiles on any of its <strong>8 surrounding points</strong>: those tiles cannot be moved by an Arrange (an accent can still move them). While its owner has a <em>blooming</em> White Lotus on the board, that player's Orchid becomes <strong>wild</strong>: it can capture any opposing flower tile ("raging"), and it can itself be captured by any opposing flower tile ("vulnerable"). Without a blooming Lotus, an Orchid can only be captured by an opponent's wild Orchid.</p>
 
     <h2>Winning the Game</h2>
-    <p>The game ends by one of three conditions (checked in this order):</p>
+    <p>You may never make a move that leaves your opponent with no legal move on their next turn. The game ends by one of these:</p>
     <ol>
-        <li><strong>Harmony Ring</strong> — a connected loop of <em>your own</em> harmonies that fully encloses the center space. The player who completes it wins immediately.</li>
-        <li><strong>Last Basic Flower</strong> — the moment a player plants their <em>last</em> basic flower onto the board (their basic-flower reserve becomes empty), the game ends. The winner is the player with more <strong>midline-crossing harmonies</strong> — harmonies whose two tiles lie on opposite sides of one of the four lines that divide the board into quadrants (row 9 and column 9). If both players have the same count, the game is a tie.</li>
-        <li><strong>Forfeit</strong> — a player may resign at any time.</li>
+        <li><strong>Harmony Ring</strong> — a connected loop of <em>your own</em> harmonies that fully encloses the center space. The player who completes it wins immediately. If both players complete a ring on the same move, it's a tie.</li>
+        <li><strong>Last Basic Flower</strong> — the moment a player plants their <em>last</em> basic flower onto the board (their basic-flower reserve becomes empty), the game ends. The winner is the player with more <strong>midline-crossing harmonies</strong> — harmonies whose two tiles lie on opposite sides of one of the four lines that divide the board into quadrants (row 9 and column 9); a harmony with a tile <em>on</em> a midline doesn't count. If both players have the same count, the game is a tie.</li>
+        <li><strong>No Legal Move</strong> — if a player would otherwise have no legal move, the game ends and is scored the same way as Last Basic Flower (midline-crossing harmonies).</li>
+        <li><strong>Resign</strong> — a player may resign at any time; the opponent wins.</li>
     </ol>
 
     <div class="tip">
