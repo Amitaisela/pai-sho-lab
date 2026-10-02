@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Learn — Pai Sho Lab{% endblock %}
+{% block content %}
+<div class="learn">
+  <h1>Learn Skud Pai Sho</h1>
+  <p class="muted">A two-player strategy game on a circular board. Plant flowers, form harmonies, and close a ring around the center to win.</p>
+
+  <section class="learn-tutorial" id="tutorial">
+    <div class="learn-tutorial__head">
+      <h2>Interactive tutorial</h2>
+      <ol class="learn-dots" id="tutorial-dots" aria-label="Tutorial progress"></ol>
+    </div>
+
+    <div id="tutorial-intro">
+      <p class="muted">Seven short steps, each a real position. Make the move asked for and get instant feedback.</p>
+      <button type="button" class="btn btn-primary" id="tutorial-start-btn">Start tutorial</button>
+    </div>
+
+    <div id="tutorial-step" class="learn-step" hidden>
+      <div class="learn-step-brief">
+        <h3 id="tutorial-step-title"></h3>
+        <p class="muted" id="tutorial-step-text"></p>
+      </div>
+      <div id="tutorial-board"></div>
+      <div class="learn-step-outcome">
+        <p class="learn-feedback" id="tutorial-feedback" role="status" aria-live="polite"></p>
+        <div class="learn-step-actions">
+          <button type="button" class="btn btn-quiet" id="tutorial-reset-btn">Start this step over</button>
+          <button type="button" class="btn btn-primary" id="tutorial-next-btn" hidden>Next</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tutorial-done" class="learn-step" hidden>
+      <h3>Tutorial complete</h3>
+      <p class="muted">You've covered planting, arranging, harmonies, captures, bonuses, accents and the Harmony Ring. Time to play.</p>
+      <div class="learn-step-actions">
+        <a class="btn btn-primary" href="/">Play now</a>
+        <button type="button" class="btn btn-quiet" id="tutorial-restart-btn">Restart tutorial</button>
+      </div>
+    </div>
+  </section>
+
+  <article class="learn-rules">
+    <h2 id="the-goal">The Goal</h2>
+    <p>Be the first player to form a <strong class="learn-hl">Harmony Ring</strong> — a connected chain of your own harmonies that fully encloses the center of the board. Other endings exist (last basic flower planted, no legal move, resign) and are covered below.</p>
+
+    <h2 id="board-and-tiles">The Board &amp; Your Tiles</h2>
+    <ul>
+      <li>The board is a circle inside a 19×19 grid with four <strong>Gates</strong> on the cardinal edges (N, S, E, W). Flowers enter play through your Gates. A tile may pass <em>through</em> an open Gate while moving, but a move may never end on one.</li>
+      <li>The playing surface is split into <strong>Red</strong>, <strong>White</strong>, and <strong>Neutral</strong> gardens. A red flower may not <em>end</em> a move on a white garden space, and a white flower may not end on a red one; passing through is fine. The center space itself cannot be occupied.</li>
+      <li>Each player's set contains <strong>3 of each Basic Flower</strong> (red: Rose R3, Chrysanthemum R4, Rhododendron R5 — white: Jasmine W3, Lily W4, Jade W5), <strong>1 White Lotus</strong> and <strong>1 Orchid</strong>, and <strong>4 chosen Accent Tiles</strong> out of 8 available (Rock, Wheel, Knotweed, Boat — up to 2 of any one type; the default choice is one of each).</li>
+      <li>The <strong>Guest</strong> (Player 1) moves first. To start, a basic flower begins growing in both players' Gates — or the game can start informally, with no tile pre-placed.</li>
+    </ul>
+
+    <h2 id="circle-of-harmony">The Circle of Harmony</h2>
+    <p>The six basic flowers relate to each other on a circle. <strong class="learn-hl">Adjacent</strong> flowers can form a harmony with each other. Flowers <strong class="learn-clash">opposite</strong> on the circle (same number, opposite colour) <strong>clash</strong>.</p>
+
+    <div class="learn-circle">
+      <svg viewBox="-40 0 480 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The Circle of Harmony: a hexagon of the six basic flowers, with harmony lines along the edges and clash lines through the center">
+        <g style="stroke: var(--danger); stroke-width: 2; stroke-dasharray: 6 5; opacity: 0.85;">
+          <line x1="200" y1="70"     x2="200" y2="330"/>
+          <line x1="312.58" y1="135" x2="87.42" y2="265"/>
+          <line x1="312.58" y1="265" x2="87.42" y2="135"/>
+        </g>
+        <g style="stroke: var(--accent); stroke-width: 3; opacity: 0.9;">
+          <line x1="200"    y1="70"  x2="312.58" y2="135"/>
+          <line x1="312.58" y1="135" x2="312.58" y2="265"/>
+          <line x1="312.58" y1="265" x2="200"    y2="330"/>
+          <line x1="200"    y1="330" x2="87.42"  y2="265"/>
+          <line x1="87.42"  y1="265" x2="87.42"  y2="135"/>
+          <line x1="87.42"  y1="135" x2="200"    y2="70"/>
+        </g>
+        <image href="/static/tiles/HR3.png" x="172" y="42"  width="56" height="56"/>
+        <image href="/static/tiles/HR4.png" x="284.58" y="107" width="56" height="56"/>
+        <image href="/static/tiles/HR5.png" x="284.58" y="237" width="56" height="56"/>
+        <image href="/static/tiles/HW3.png" x="172" y="302" width="56" height="56"/>
+        <image href="/static/tiles/HW4.png" x="59.42" y="237" width="56" height="56"/>
+        <image href="/static/tiles/HW5.png" x="59.42" y="107" width="56" height="56"/>
+        <g style="font-family: system-ui, sans-serif; font-size: 11px; fill: var(--text);">
+          <text x="200" y="24"  text-anchor="middle">Rose (R3)</text>
+          <text x="200" y="378" text-anchor="middle">Jasmine (W3)</text>
+          <text x="352" y="138" text-anchor="start">Chrys. (R4)</text>
+          <text x="352" y="272" text-anchor="start">Rhodo. (R5)</text>
+          <text x="48"  y="138" text-anchor="end">Jade (W5)</text>
+          <text x="48"  y="272" text-anchor="end">Lily (W4)</text>
+        </g>
+      </svg>
+      <div class="learn-legend">
+        <span class="learn-legend__item"><span class="learn-legend__swatch learn-legend__swatch--harmony"></span> Harmony (adjacent)</span>
+        <span class="learn-legend__item"><span class="learn-legend__swatch learn-legend__swatch--clash"></span> Clash (opposite)</span>
+      </div>
+    </div>
+
+    <h2 id="your-turn">Your Turn</h2>
+    <p>On each turn, take <strong>one</strong> of the following actions:</p>
+    <ul>
+      <li><strong>Plant</strong> — place a basic flower from your reserve onto one of your own open Gates.</li>
+      <li><strong>Arrange</strong> — move a basic or special flower already on the board in a straight line (no diagonals, no jumping over tiles) up to its movement range.</li>
+    </ul>
+    <p>A flower is <strong>Blooming</strong> once it has left its Gate and is standing on a legal garden space. Only blooming flowers participate in harmonies and most interactions. Freshly-planted flowers on their Gate are <em>growing</em>, not yet blooming.</p>
+
+    <h2 id="flower-moves">Flower Moves</h2>
+    <table class="learn-table">
+      <thead><tr><th>Tile</th><th>Type</th><th>Moves</th></tr></thead>
+      <tbody>
+        <tr><td>Rose</td><td>Red basic</td><td>3</td></tr>
+        <tr><td>Chrysanthemum</td><td>Red basic</td><td>4</td></tr>
+        <tr><td>Rhododendron</td><td>Red basic</td><td>5</td></tr>
+        <tr><td>Jasmine</td><td>White basic</td><td>3</td></tr>
+        <tr><td>Lily</td><td>White basic</td><td>4</td></tr>
+        <tr><td>Jade</td><td>White basic</td><td>5</td></tr>
+        <tr><td>White Lotus</td><td>Special</td><td>2</td></tr>
+        <tr><td>Orchid</td><td>Special</td><td>6</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="harmonies">Harmonies</h2>
+    <p>Two of your <strong>blooming</strong> basic flowers form a <strong class="learn-hl">Harmony</strong> when:</p>
+    <ul>
+      <li>They are <strong>neighbours on the Circle of Harmony</strong> (see diagram above), and</li>
+      <li>They share the same row or column, with <strong>nothing between them</strong> (no flowers, accent tiles, or disabling effects).</li>
+    </ul>
+    <p>Harmonies belong to you and appear on the board as a coloured line linking the two tiles.</p>
+
+    <h3 id="harmony-bonus">Harmony Bonus</h3>
+    <p>Whenever an Arrange <em>creates a new harmony</em> (a pair that wasn't in harmony before your move), you get <strong>one optional</strong> bonus action: place an accent tile from your reserve, plant a special flower (White Lotus / Orchid) onto an open Gate, or — only if none of your flowers are currently growing — plant a basic flower onto an open Gate. You may also skip the bonus. Forming several harmonies at once still earns only one bonus, and a bonus never earns another bonus.</p>
+
+    <h2 id="clashes">Clashes</h2>
+    <p>Two basic flowers <strong class="learn-clash">clash</strong> when they sit <strong>opposite</strong> each other on the Circle of Harmony (same number, opposite colour: Rose↔Jasmine, Chrysanthemum↔Lily, Rhododendron↔Jade). Clashing flowers <strong>cannot form a harmony</strong> on a line that runs through the other, regardless of who owns them.</p>
+
+    <h3 id="clash-traps">Clash Traps</h3>
+    <p>A <strong>clash trap</strong> happens when a flower ends up on a line with an opposing clash partner such that it can't move without colliding further. Use clashes to block your opponent's intended harmony lines.</p>
+
+    <h2 id="captures">Captures</h2>
+    <p>You may <strong>capture</strong> an opposing basic flower by landing on it if the two flowers <strong class="learn-clash">clash</strong>. A wild Orchid (see below) may capture any opposing flower tile, and a wild Orchid may itself be captured by any opposing flower tile. Accent tiles and growing (not-yet-blooming) tiles are never captured. Captured tiles are removed from the game for good — they do not return to a reserve.</p>
+
+    <h2 id="accent-tiles">Accent Tiles</h2>
+    <p>Accent tiles are placed as a <strong>Harmony Bonus</strong>. Each accent has its own placement rules and effect:</p>
+    <ul>
+      <li><strong>Rock</strong> — an immovable obstacle placed on an open point. It cancels harmonies (of either player) that run along its row or column. Cannot be placed on a Gate, and a Wheel can never move a Rock.</li>
+      <li><strong>Wheel</strong> — placed on an open point, never one that is next to a Rock. When placed, it rotates the eight surrounding tiles one step <em>clockwise</em> around it. The whole rotation must be fully legal — no tile may be pushed off the board, into a Gate, out of a Gate, into the wrong-coloured garden, or into a clash — otherwise the Wheel cannot be placed there at all.</li>
+      <li><strong>Knotweed</strong> — placed on an open point; it drains harmonies for any flower (of either player) on its 8 surrounding points. It does not move them, only mutes them.</li>
+      <li><strong>Boat</strong> — placed on any blooming flower or any accent tile, yours or your opponent's. On a flower, the Boat replaces it and the flower moves to one of the 8 surrounding empty points. On an accent, both the accent and the Boat are removed from the game, leaving the point open.</li>
+    </ul>
+
+    <h2 id="special-flowers">Special Flower Tiles</h2>
+    <p>Special flowers are <em>not</em> in your starting reserve in play; you deploy them via a Harmony Bonus (place onto one of your open Gates, like planting a basic flower).</p>
+    <h3 id="white-lotus">White Lotus</h3>
+    <p>Moves up to 2 spaces. The White Lotus may form a harmony with <em>any</em> basic flower on the same row/column (with nothing in between), regardless of whom the basic flower belongs to. A harmony that involves an opponent's basic flower still belongs to the owner of that basic flower — use carefully.</p>
+    <h3 id="orchid">Orchid</h3>
+    <p>Moves up to 6 spaces — the longest range in the game. The Orchid <strong>traps</strong> the opponent's flower tiles on any of its <strong>8 surrounding points</strong>: those tiles cannot be moved by an Arrange (an accent can still move them). While its owner has a <em>blooming</em> White Lotus on the board, that player's Orchid becomes <strong>wild</strong>: it can capture any opposing flower tile ("raging"), and it can itself be captured by any opposing flower tile ("vulnerable"). Without a blooming Lotus, an Orchid can only be captured by an opponent's wild Orchid.</p>
+
+    <h2 id="winning">Winning the Game</h2>
+    <p>You may never make a move that leaves your opponent with no legal move on their next turn. The game ends by one of these:</p>
+    <ol>
+      <li><strong>Harmony Ring</strong> — a connected loop of <em>your own</em> harmonies that fully encloses the center space. The player who completes it wins immediately. If both players complete a ring on the same move, it's a tie.</li>
+      <li><strong>Last Basic Flower</strong> — the moment a player plants their <em>last</em> basic flower onto the board (their basic-flower reserve becomes empty), the game ends. The winner is the player with more <strong>midline-crossing harmonies</strong> — harmonies whose two tiles lie on opposite sides of one of the four lines that divide the board into quadrants (row 9 and column 9); a harmony with a tile <em>on</em> a midline doesn't count. If both players have the same count, the game is a tie.</li>
+      <li><strong>No Legal Move</strong> — if a player would otherwise have no legal move, the game ends and is scored the same way as Last Basic Flower (midline-crossing harmonies).</li>
+      <li><strong>Resign</strong> — a player may resign at any time; the opponent wins.</li>
+    </ol>
+
+    <div class="learn-tip">
+      <strong>Tip:</strong> Harmonies are worth more than captures. Plan your ring around the center from your very first plant — the opening Gate you choose decides the geometry of the whole game.
+    </div>
+
+    <p class="muted learn-credit">
+      Full original rulebook and variants at
+      <a href="https://skudpaisho.com/" target="_blank" rel="noopener">skudpaisho.com</a>.
+    </p>
+  </article>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/tutorial.js"></script>
+{% endblock %}

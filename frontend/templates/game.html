@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Game — Pai Sho Lab{% endblock %}
+{% block content %}
+  <div id="game-root" class="game" data-gid="{{ gid }}">
+    <div id="game-badge" class="game__badge" hidden>Watching</div>
+    <div id="game-top-strip" class="strip"></div>
+    <div id="game-board"></div>
+    <div id="game-bottom-strip" class="strip"></div>
+    <p id="game-hint" class="game__hint muted"></p>
+    <div id="game-actions" class="game__actions"></div>
+    <details id="game-moves" class="game__moves">
+      <summary>Moves</summary>
+      <ol id="game-move-list"></ol>
+    </details>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/game.js"></script>
+{% endblock %}

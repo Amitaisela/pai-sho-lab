@@ -11,6 +11,7 @@
 8. Running and benchmarking agents
 9. Tests
 10. Public mirror implications
+11. Player-facing endpoints (`backend/ui/play.py`) and the seat-token rule
 
 ## 1. Importing the engine and choosing Python or Rust
 `pyproject.toml` puts `engine/` and `backend/` on the package path, so after `pip install -e .`:
@@ -216,3 +217,34 @@ These use a custom pass/fail runner, not pytest. When you test captures, assert 
   - the tests in `KEEP_TESTS`: `tests/basic_tests.py`, `tests/test_rules_contract.py`, `tests/parity_fuzz.py`, `tests/test_notation.py` (see §9);
   - `README.public.md`, renamed to `README.md`.
 - This skill ships to the mirror too. Keep it free of anything that only makes sense in the private repo, or make those parts clearly optional.
+
+## 11. Player-facing endpoints (`backend/ui/play.py`) and the seat-token rule
+
+Phase 1 added `backend/ui/play.py`, a blueprint (imported as `ui.play`, mounted into `server.py`'s app) that owns a second, player-facing game registry separate from the Lab's open `/lab/board`. It tracks, per registered game id: `mode` (`'human'` | `'pass'` | `'bot'`), `seats` (`{1: {...}, 2: {...}}`, each with a `name`, `kind` (`'human'`|`'bot'`), and — for a human seat in a `'human'`-mode game only — a secret `token`), plus `created`/`last_active` for idle eviction (`IDLE_SECONDS = 1800`) and a per-IP create rate limit (`RATE_LIMIT = (20, 60)`).
+
+**The seat-token rule:** only `mode == 'human'` games issue tokens, and only for the two human seats. A game created this way can't be moved, undone, redone, or overwritten by a browser that doesn't hold a matching `seat_token` — `play.guard(gid, action, body)` is the single choke point server.py's mutating endpoints (`plant`, `arrange`, `skip_bonus`, `resign`, `undo`, `redo`, `set_state`, `load`, `import_psn`, `new_game`) call before touching a registered game:
+- unknown/unregistered `gid` (e.g. a Lab game) → `guard` returns `None`, meaning "unchanged legacy behaviour" — no seat check at all;
+- `undo` / `set_state` / `new_game` are always rejected (403) in `mode == 'human'`, seated or not — a person-vs-person game can never be rewound or replaced;
+- `bot_move` is only allowed when it's actually the seated bot's turn (409 otherwise) — a spectator or the human's own tab can't make the bot move for the human;
+- `mode == 'pass'` games skip the token check entirely (pass-and-play is intentionally open — both seats share one browser);
+- otherwise (`mode in ('human', 'bot')`) the caller's `body['seat_token']` must match one of `meta['seats'][*]['token']` (`hmac.compare_digest`), or 403 `'not your seat'`; a `move` action additionally 403s `'not your turn'` if it's not that seat's `current_player` turn, and `resign` 403s unless `player == who`.
+
+A per-game `threading.Lock` from `play.game_lock(gid)` wraps the guard check and the mutation it authorises, so two near-simultaneous requests on the same game (a double-submitted move, two `bot_move` calls) can't interleave.
+
+**Routes** (all under `/api/`, JSON in/out):
+| Route | Purpose |
+|---|---|
+| `POST /api/challenge` | Create a `mode='human'` game with one named seat and one open seat; returns `join_url: /game/<id>` to share |
+| `POST /api/join/<gid>` | Take the open seat in a challenge; returns that seat's `seat_token` |
+| `POST /api/seek` | Quick-match: pairs with the oldest waiting seek from a different `client_id` (never pairs a browser with itself), or registers a new seek and returns `seek_id` |
+| `GET /api/seek/<sid>` | Poll a seek (`client_id` query param must match); `{"status": "waiting"}` or `{"status": "paired", game_id, seat, seat_token}` |
+| `DELETE /api/seek/<sid>` | Cancel your own seek |
+| `GET /api/seeks` | Public list of open seeks (nickname + age), for the "waiting" UI |
+| `POST /api/bot_game` | Create a `mode='bot'` game against a MushiBot house level (1–6); the human seat gets a token, the bot seat doesn't |
+| `POST /api/pass_game` | Create a `mode='pass'` game; neither seat gets a token |
+| `GET /api/game/<gid>` | Poll state (also touches `last_active`); 404 `'this game has ended or expired'` once evicted — the page shows that message with Home/New game links |
+| `GET /api/live` | Newest 20 in-progress games with both seats filled; pass-and-play and open challenges are never listed (anyone holding the id could move in them) |
+| `GET /api/house_bots` | The six `house_bots()` levels, for the bot-game picker |
+| `GET /api/lab/check` | Whether this browser's stored token unlocks the `/lab` menu entry (owner-only; doesn't gate the Lab's routes themselves) |
+
+Seat tokens live in the browser's `localStorage`, keyed per game id (`static/js/ui.js`), so reloading or reopening `/game/<id>` keeps the seat without re-authenticating. `evict_idle()` drops a game's `META` entry, its server-side game object, and (via the `on_evict` hook `init()` was given) any per-game Lab state like undo stacks or cached bot agents, once it's been idle past `IDLE_SECONDS` or its game object is already gone.

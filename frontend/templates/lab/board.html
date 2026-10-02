@@ -560,7 +560,12 @@
         }
         .adv-panel .info:hover { background: var(--accent); color: #fff; }
 
-        @media (max-width: 700px) {
+        /* The header packs a logo, 5 nav links, an engine select and ~9
+           buttons into one 44px-tall row with no wrap, so it was cramped
+           (overlapping/clipped) well before a narrow phone width - the
+           hamburger collapse already handles this correctly, it just used
+           to kick in too late (700px). */
+        @media (max-width: 1150px) {
           header {
             height: auto;
             flex-wrap: wrap;
@@ -607,11 +612,12 @@
         <button class="btn hamburger-btn" id="nav-toggle-btn" onclick="toggleNavMenu()" aria-label="Menu" aria-expanded="false">&#9776;</button>
     </div>
     <nav class="nav-links" id="nav-links">
-        <a href="/train" class="btn" style="text-decoration:none;">Train</a>
-        <a href="/simulate" class="btn" style="text-decoration:none;">Simulate</a>
-        <a href="/leaderboard" class="btn" style="text-decoration:none;">Leaderboard</a>
-        <a href="/rules" class="btn" style="text-decoration:none;">Rules</a>
-        <a href="/guide" class="btn" style="text-decoration:none;">Guide</a>
+        <a href="/" class="btn" style="text-decoration:none;">← Pai Sho Lab</a>
+        <a href="/lab/train" class="btn" style="text-decoration:none;">Train</a>
+        <a href="/lab/simulate" class="btn" style="text-decoration:none;">Simulate</a>
+        <a href="/lab/leaderboard" class="btn" style="text-decoration:none;">Leaderboard</a>
+        <a href="/learn" class="btn" style="text-decoration:none;">Rules</a>
+        <a href="/lab/guide" class="btn" style="text-decoration:none;">Guide</a>
     </nav>
     <div class="header-actions">
         <label style="display:flex;align-items:center;gap:4px;font-size:12px;" title="Whether game results count toward ELO ratings">
@@ -657,7 +663,7 @@
             <em>Plant</em> at a Gate, then <em>Arrange</em> your tiles.<br>
             Pair circle-neighbours to form a <em>Harmony</em>.<br>
             <em>Win</em>: ring the center with your harmonies.
-            <div style="margin-top:6px;"><a href="/rules" style="color:var(--link);text-decoration:none;">Full rules →</a></div>
+            <div style="margin-top:6px;"><a href="/learn" style="color:var(--link);text-decoration:none;">Full rules →</a></div>
         </div>
     </div>
 
@@ -861,9 +867,17 @@
     }
 
     async function post(url, body={}) {
+      // Lab game APIs are gated behind MUSHIBOT_API_TOKEN (server.py's
+      // _lab_gate_gid) for every gid that isn't a registered player game -
+      // which every Lab-created game is. Send the owner's token, the same
+      // key ui.js's setLabToken()/labCheck() use, so the Lab keeps working
+      // once a token is configured.
+      const token = (() => { try { return localStorage.getItem('mushibot_api_token') || ''; } catch { return ''; } })();
+      const headers = {'Content-Type':'application/json'};
+      if (token) headers['X-API-Token'] = token;
       const r = await fetch(url, {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers,
         body: JSON.stringify(body)
       });
       return r.json();

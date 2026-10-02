@@ -1,0 +1,528 @@
+[
+  {
+    "id": "plant",
+    "title": "Plant a flower",
+    "text": "Flowers enter the board through a Gate. Tap one of your flowers below, then tap a highlighted Gate to plant it.",
+    "state": {
+      "version": 2,
+      "board": {
+        "1,9": {
+          "flower": "Jasmine",
+          "player": 2,
+          "growing": true
+        },
+        "9,1": {
+          "flower": "Lily",
+          "player": 2,
+          "growing": true
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 2,
+          "Lily": 2,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": false,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "action_kind",
+      "kind": "plant"
+    }
+  },
+  {
+    "id": "arrange",
+    "title": "Arrange a flower",
+    "text": "Once a flower has bloomed, you can move it instead of planting a new one. Tap your Rose, then tap a highlighted point to move it.",
+    "state": {
+      "version": 2,
+      "board": {
+        "9,5": {
+          "flower": "Rose",
+          "player": 1,
+          "growing": false
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": false,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "action_kind",
+      "kind": "arrange"
+    }
+  },
+  {
+    "id": "harmony",
+    "title": "Form a harmony",
+    "text": "Rose and Chrysanthemum are neighbours on the Circle of Harmony. Line your Chrysanthemum up with your Rose on the same row or column, with nothing between them, to form a harmony.",
+    "state": {
+      "version": 2,
+      "board": {
+        "9,5": {
+          "flower": "Rose",
+          "player": 1,
+          "growing": false
+        },
+        "6,8": {
+          "flower": "Chrysanthemum",
+          "player": 1,
+          "growing": false
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": false,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "harmony_created"
+    }
+  },
+  {
+    "id": "capture",
+    "title": "Capture by clash",
+    "text": "Rose and Jasmine clash - they sit opposite each other on the Circle. Move your Rose onto the opposing Jasmine to capture it for good.",
+    "state": {
+      "version": 2,
+      "board": {
+        "9,5": {
+          "flower": "Rose",
+          "player": 1,
+          "growing": false
+        },
+        "9,7": {
+          "flower": "Jasmine",
+          "player": 2,
+          "growing": false
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": false,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "capture"
+    }
+  },
+  {
+    "id": "bonus",
+    "title": "Use a Harmony Bonus",
+    "text": "Your Rose and Chrysanthemum are already in harmony, so you have a Harmony Bonus to spend. Plant your White Lotus onto the open Gate to use it.",
+    "state": {
+      "version": 2,
+      "board": {
+        "9,5": {
+          "flower": "Rose",
+          "player": 1,
+          "growing": false
+        },
+        "9,8": {
+          "flower": "Chrysanthemum",
+          "player": 1,
+          "growing": false
+        },
+        "1,9": {
+          "flower": "Jade",
+          "player": 2,
+          "growing": true
+        },
+        "17,9": {
+          "flower": "Jade",
+          "player": 2,
+          "growing": true
+        },
+        "9,17": {
+          "flower": "Jade",
+          "player": 2,
+          "growing": true
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 1
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": true,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "bonus_used"
+    }
+  },
+  {
+    "id": "accent",
+    "title": "Place an accent",
+    "text": "A Harmony Bonus can also place an accent tile. Place your Boat on your opponent's Rock - both tiles leave the game.",
+    "state": {
+      "version": 2,
+      "board": {
+        "12,12": {
+          "flower": "Rock",
+          "player": 2,
+          "growing": false
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 2,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": true,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "accent_placed"
+    }
+  },
+  {
+    "id": "ring",
+    "title": "Complete a Harmony Ring",
+    "text": "A ring is a closed loop of your own harmonies around the center. Move your White Lotus to the highlighted point to close the loop and win.",
+    "state": {
+      "version": 2,
+      "board": {
+        "7,5": {
+          "flower": "Rose",
+          "player": 1,
+          "growing": false
+        },
+        "7,13": {
+          "flower": "Chrysanthemum",
+          "player": 1,
+          "growing": false
+        },
+        "14,13": {
+          "flower": "Rhododendron",
+          "player": 1,
+          "growing": false
+        },
+        "14,2": {
+          "flower": "Jasmine",
+          "player": 1,
+          "growing": false
+        },
+        "8,3": {
+          "flower": "WhiteLotus",
+          "player": 1,
+          "growing": false
+        }
+      },
+      "hands": {
+        "1": {
+          "Rose": 0,
+          "Chrysanthemum": 0,
+          "Rhododendron": 0,
+          "Jasmine": 0,
+          "Lily": 0,
+          "Jade": 0,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        },
+        "2": {
+          "Rose": 3,
+          "Chrysanthemum": 3,
+          "Rhododendron": 3,
+          "Jasmine": 3,
+          "Lily": 3,
+          "Jade": 3,
+          "Rock": 0,
+          "Wheel": 0,
+          "Knotweed": 0,
+          "Boat": 0,
+          "Orchid": 0,
+          "WhiteLotus": 0
+        }
+      },
+      "current_player": 1,
+      "bonus_turn": false,
+      "setup": {
+        "accents": {
+          "1": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ],
+          "2": [
+            "Rock",
+            "Wheel",
+            "Knotweed",
+            "Boat"
+          ]
+        },
+        "opening": null
+      }
+    },
+    "goal": {
+      "type": "ring"
+    }
+  }
+]

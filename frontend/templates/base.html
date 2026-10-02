@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Pai Sho Lab{% endblock %}</title>
+  <script>
+    // Applied before first paint so a saved manual theme choice doesn't flash
+    // the system-default theme for a frame; ui.js's initChrome() is the
+    // source of truth after that.
+    try {
+      var t = localStorage.getItem('pai_theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="/static/css/pai.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="topbar__brand" href="/">
+      <img class="topbar__logo" src="/static/tiles/GL.png" alt="" width="28" height="28">
+      Pai Sho Lab
+    </a>
+    <div class="topbar__right">
+      <button type="button" class="chip" data-nickname-chip aria-label="Your nickname">Guest</button>
+      <button type="button" class="menu-btn" data-menu-btn aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+      <a id="lab-link" href="/lab" hidden>Lab</a>
+    </div>
+  </header>
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script type="module">
+    import * as ui from '/static/js/ui.js';
+    ui.initChrome();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

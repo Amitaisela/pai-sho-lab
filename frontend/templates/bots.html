@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Bots — Pai Sho Lab{% endblock %}
+{% block content %}
+<div class="bots">
+  <h1>Play MushiBot</h1>
+  <p class="muted">Six levels, each one built a different way under the hood. Start anywhere — you can switch levels before every game.</p>
+  <div class="bots-grid" id="bots-grid"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/bots.js"></script>
+{% endblock %}

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Lab — Pai Sho Lab{% endblock %}
+{% block content %}
+  <p class="muted"><a href="/">← Pai Sho Lab</a></p>
+  <h1>Lab</h1>
+
+  <div id="lab-gate" class="lab-gate" hidden>
+    <h2>The Lab is for the site owner</h2>
+    <p class="muted">Enter the owner token to unlock the full-control board, training, simulation and the Elo leaderboard.</p>
+    <label class="game__field">Owner token
+      <input id="lab-token-input" type="password" autocomplete="off" placeholder="Paste the token">
+    </label>
+    <button type="button" class="btn btn-primary" id="lab-token-submit">Unlock</button>
+    <p class="learn-feedback is-error" id="lab-token-error" role="status" aria-live="polite" hidden>That token isn't right.</p>
+  </div>
+
+  <div id="lab-tools" hidden>
+    <p class="muted">Owner-only tools: the full-control board, training, simulation and the Elo leaderboard.</p>
+    <div class="tile-grid">
+      <a class="tile" href="/lab/board">
+        <h3>Board</h3>
+        <p class="muted">Full-control play: any setup, AI vs AI, save/load, PSN.</p>
+      </a>
+      <a class="tile" href="/lab/train">
+        <h3>Train</h3>
+        <p class="muted">Run and monitor training jobs for every trainable agent.</p>
+      </a>
+      <a class="tile" href="/lab/simulate">
+        <h3>Simulate</h3>
+        <p class="muted">Batch games between agents, with live stats.</p>
+      </a>
+      <a class="tile" href="/lab/leaderboard">
+        <h3>Leaderboard</h3>
+        <p class="muted">Elo ratings and history.</p>
+      </a>
+      <a class="tile" href="/lab/guide">
+        <h3>Guide</h3>
+        <p class="muted">How to add a new agent.</p>
+      </a>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/lab_gate.js"></script>
+{% endblock %}

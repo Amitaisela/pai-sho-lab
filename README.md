@@ -38,17 +38,21 @@ Everything else happens in the browser.
 - **Clash:** opposites (R3/W3, R4/W4, R5/W5). A move may never line them up, even if uncovering one. You capture an enemy basic flower that clashes with yours by landing on it; captured tiles leave the game for good.
 - **Bonus:** an Arrange that creates a new harmony earns one optional bonus — place an accent tile (Rock, Wheel, Knotweed, Boat), plant a special flower (White Lotus, Orchid), or (if none of yours are growing) plant a basic flower — or skip it.
 
-Full rules are on the **Rules** page in the app. Developers who use Claude Code also get a rules and engine reference skill at [.claude/skills/skud-pai-sho/](.claude/skills/skud-pai-sho/SKILL.md). The engine now matches the official rulebook closely; the skill lists the few remaining intentional differences.
+Full rules are on the **Learn** page (`/learn`) in the app. Developers who use Claude Code also get a rules and engine reference skill at [.claude/skills/skud-pai-sho/](.claude/skills/skud-pai-sho/SKILL.md). The engine now matches the official rulebook closely; the skill lists the few remaining intentional differences.
 
 ## I want to play
 
-Open http://localhost:5000. The **Play** page is the home page:
+Open http://localhost:5000. The home page (`/`) puts playing another person first:
 
-1. For each side, choose **Human** or an agent. You can play vs. an AI, human vs. human, or watch AI vs. AI.
-2. Press **Start Game**, then click a tile and one of its highlighted destinations to move.
-3. Turn **Rated** on to have the result count toward the Elo leaderboard.
+1. **Quick match** pairs you with the next person looking for a game, **Challenge a friend** gives you a link (`/game/<id>`) to send them, and **Pass and play** is one device, two players.
+2. Click a tile, then one of its highlighted destinations to move.
+3. **Play MushiBot** (secondary row, or `/bots`) plays a house bot instead — the full site has six levels; this kit ships two (see [Agents that ship here](#agents-that-ship-here)).
 
-**Engine: Python/Rust** picks which rules implementation runs the game. Leave it on Python unless you've built the Rust engine (see [Engines](#engines)).
+**Everything in this version is unrated** — no Elo, accounts, or clock yet. `/learn` has the rules plus a short interactive tutorial for newcomers.
+
+If you're running this on a private network (e.g. a Tailscale tailnet via [Docker](#running-with-docker)), anyone on it can open the same URL and use Quick match or a challenge link to play you directly; the seat they land in is tied to a token in their browser's `localStorage`, so reloading the page keeps their seat.
+
+**Engine: Python/Rust** — new games use the Rust engine automatically once it's built (see [Engines](#engines)); otherwise they fall back to Python.
 
 ## I want to benchmark agents
 
@@ -198,8 +202,11 @@ This runs the app plus a Tailscale sidecar. The app is reachable at `http://loca
 ## Testing
 
 ```bash
-python tests/basic_tests.py   # test suite (what CI runs)
-python -m Agents.registry     # registry validation
+python tests/basic_tests.py         # test suite (what CI runs)
+python tests/test_rules_contract.py
+python tests/parity_fuzz.py
+python tests/test_notation.py
+python -m Agents.registry           # registry validation
 cd engine/RustEngine && cargo test --workspace   # Rust engine, if you have a toolchain
 ```
 
@@ -213,7 +220,8 @@ Agents/registry.py       Every agent's UI/training/CLI metadata; the single sour
 Agents/classical/        basic_minimax (weightless template)
 Agents/rl/               cnn_basic (trainable template)
 Agents/training/         Training scripts + shared opponent loader
-backend/ui/server.py     Flask app: Play, Simulate, Train, Leaderboard, Rules, Guide pages
+backend/ui/server.py     Flask app: home, game, learn, bots, developers pages, plus /lab (board, simulate, train, leaderboard, guide)
+backend/ui/play.py       Player-facing game registry: modes, seat tokens, quick-match seeks, live list
 backend/simulator.py     Headless game runner
 scripts/new_agent.py     Agent scaffolder
 data/params/             Saved weights

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Developers — Pai Sho Lab{% endblock %}
+{% block content %}
+<div class="dev">
+  <h1>Developers</h1>
+  <p>
+    Pai Sho Lab's engine, agents, and local arena are open source at
+    <a href="https://github.com/Amitaisela/pai-sho-lab" target="_blank" rel="noopener">github.com/Amitaisela/pai-sho-lab</a>
+    — a pruned mirror of the private research codebase, kept in sync automatically. Clone it, add
+    an agent in one Python file and one registry entry, then run it against the house bots on
+    your own machine.
+  </p>
+
+  <pre class="dev-code"><code>git clone https://github.com/Amitaisela/pai-sho-lab.git
+
+python scripts/eval_agents.py my_agent --vs basic_minimax --games 20 --engine python
+
+python scripts/round_robin.py random basic_minimax cnn_basic my_agent --games 10 --engine python</code></pre>
+
+  <p class="learn-tip">Developer mode — connect your own bot to play other bots and MushiBot — is coming in a later version.</p>
+</div>
+{% endblock %}

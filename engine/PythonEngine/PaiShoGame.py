@@ -289,15 +289,15 @@ class PaiShoGame:
         game = cls(opening=None)
         try:
             game.board = {
-                tuple(map(int, pos_str.split(','))): tile
+                tuple(map(int, pos_str.split(','))): dict(tile)   # copy: never alias the caller's dict
                 for pos_str, tile in d['board'].items()
             }
         except (AttributeError, ValueError) as e:
             raise ValueError(f"malformed board key: {e}")
         hands = d['hands']
         game.hands = {
-            1: hands.get('1', hands.get(1, {})),
-            2: hands.get('2', hands.get(2, {})),
+            1: dict(hands.get('1', hands.get(1, {}))),
+            2: dict(hands.get('2', hands.get(2, {}))),
         }
         game.current_player = d['current_player']
         game.winner = d.get('winner')

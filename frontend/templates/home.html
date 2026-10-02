@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Pai Sho Lab{% endblock %}
+{% block content %}
+  <div class="home-grid">
+    <section id="home-play-block" class="home-play" aria-labelledby="home-play-heading">
+      <h1 id="home-play-heading">Play a person</h1>
+      <div class="tile-grid">
+        <button type="button" class="tile tile--primary" id="quick-match-tile">
+          <img class="tile-icon" src="/static/tiles/GL.png" alt="" width="36" height="36">
+          <span class="tile-text">
+            <h3>Quick match</h3>
+            <p class="tile-sub muted">Get paired with the next person looking for a game.</p>
+          </span>
+        </button>
+        <ul id="quick-match-seeks" class="qm-seeks" hidden></ul>
+
+        <button type="button" class="tile" id="challenge-tile">
+          <img class="tile-icon" src="/static/tiles/HR3.png" alt="" width="36" height="36">
+          <span class="tile-text">
+            <h3>Challenge a friend</h3>
+            <p class="tile-sub muted">Share a link. They take the other seat.</p>
+          </span>
+        </button>
+
+        <button type="button" class="tile" id="pass-tile">
+          <span class="tile-icon tile-icon--pair" aria-hidden="true">
+            <img src="/static/tiles/HR3.png" alt="" width="30" height="30">
+            <img src="/static/tiles/GR3.png" alt="" width="30" height="30">
+          </span>
+          <span class="tile-text">
+            <h3>Pass and play</h3>
+            <p class="tile-sub muted">Two players, one device.</p>
+          </span>
+        </button>
+      </div>
+      <button type="button" class="btn btn-quiet custom-game-link" id="custom-game-link">Custom game</button>
+    </section>
+
+    <div id="home-side-block" class="home-side">
+      <section class="home-bots" aria-labelledby="home-bots-heading">
+        <h2 id="home-bots-heading">Play MushiBot</h2>
+        <div class="home-bots__row">
+          <div id="bot-level-row" class="chip-row"></div>
+          <button type="button" class="btn btn-primary" id="bot-play-btn">Play</button>
+        </div>
+        <p id="bot-level-line" class="muted bot-level-line"></p>
+      </section>
+
+      <a class="tile home-learn-card" href="/learn">
+        <span class="tile-text">
+          <h3>New to Pai Sho?</h3>
+          <p class="tile-sub muted">Learn in 5 minutes.</p>
+        </span>
+      </a>
+
+      <section class="home-live" aria-labelledby="home-live-heading">
+        <h2 id="home-live-heading">Live now</h2>
+        <div id="live-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <footer class="home-footer">
+    <p class="muted">
+      Rules by <a href="https://skudpaisho.com/" target="_blank" rel="noopener">@SkudPaiSho / The Garden Gate</a>
+      &middot; <a href="https://github.com/Amitaisela/pai-sho-lab" target="_blank" rel="noopener">pai-sho-lab</a>
+      &middot; v0.1.0
+    </p>
+  </footer>
+{% endblock %}
+{% block scripts %}
+  <script src="/static/vendor/qrcode.js"></script>
+  <script type="module" src="/static/js/home.js"></script>
+{% endblock %}
