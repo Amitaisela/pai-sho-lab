@@ -15,7 +15,7 @@ services:
   backend:
     build: .
     network_mode: service:tailscale
-    depends_on: [tailscale]
+    depends_on: [tailscale, postgres]
     environment:
       - MUSHIBOT_API_TOKEN=${MUSHIBOT_API_TOKEN:-}
     volumes:
@@ -29,5 +29,18 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=mushibot
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-mushibot}
+      - POSTGRES_DB=mushibot
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   tailscale-state:
+  postgres-data:

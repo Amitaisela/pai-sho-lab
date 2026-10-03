@@ -30,6 +30,9 @@ dependencies = [
     "requests>=2.32",
     "tqdm>=4.65.0",
     "torch>=2.1.0",
+    "sqlalchemy[asyncio]>=2.0.25",
+    "asyncpg>=0.29.0",
+    "alembic>=1.13.0",
 ]
 
 [project.urls]
@@ -38,7 +41,7 @@ Repository = "https://github.com/Amitaisela/pai-sho-lab"
 
 [tool.setuptools.packages.find]
 where = [".", "engine", "backend"]
-include = ["Agents*", "PythonEngine*", "ui*"]
+include = ["Agents*", "PythonEngine*", "ui*", "db*"]
 
 [tool.ruff]
 line-length = 120
