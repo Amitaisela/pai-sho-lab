@@ -11,14 +11,12 @@ ENV CARGO_HOME=/usr/local/cargo
 ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 
-COPY pyproject.toml requirements.txt alembic.ini ./
+COPY pyproject.toml requirements.txt ./
 COPY Agents/ Agents/
 COPY engine/ engine/
 COPY backend/ backend/
 COPY frontend/ frontend/
 COPY scripts/ scripts/
-COPY db/ db/
-COPY alembic/ alembic/
 RUN pip install --no-cache-dir -r requirements.txt \
  && pip install --no-cache-dir -e . \
  && pip install --no-cache-dir maturin \

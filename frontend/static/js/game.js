@@ -25,6 +25,8 @@ let resultShown = false;
 let joinOffered = false;
 let botInFlight = false;
 let pollTimer = null;
+let wsLive = false;      // true once this game's state has arrived over the socket
+let lastPly = -1;       // history length of the newest state shown; older pushes are ignored
 let hintResetTimer = null;
 
 function clearSelection() {
@@ -186,6 +188,7 @@ async function doMove(kind, body) {
 
 function applyFreshState(newState) {
   state = newState;
+  lastPly = (state.history || []).length;   // undo/redo may legitimately lower this
   over = state.winner !== null && state.winner !== undefined;
   publishDebugHook();
 }
@@ -517,6 +520,7 @@ function maybeOfferJoin() {
       close();
       const data = await ui.api(`/api/game/${gid}`);
       onGameData(data);
+      ensureSubscribed();   // re-subscribe with the new seat token
     } catch (e) {
       flashHint(e && e.error ? e.error : 'could not join');
     }
@@ -600,7 +604,7 @@ function maybeShowResultSheet() {
 // ----------------------------------------------------------------- lifecycle
 
 function showExpired() {
-  if (pollTimer) clearInterval(pollTimer);
+  stopPolling();
   root.innerHTML = `
     <div class="game__expired">
       <p>This game has ended or expired.</p>
@@ -613,6 +617,7 @@ function showExpired() {
 
 function onGameData(data) {
   state = data.state;
+  lastPly = (state.history || []).length;
   mode = data.mode;
   seats = data.seats;
   over = data.over;
@@ -621,7 +626,41 @@ function onGameData(data) {
   renderAll();
   maybeOfferJoin();
   maybeShowResultSheet();
+  // The FastAPI site plays the bot's reply inside every move request, so this is a
+  // no-op there (it isn't the bot's turn any more); the legacy Flask server does not,
+  // and relies on this driver. It also revives a bot-to-move position left by an undo.
   maybeBotMove();
+  syncPolling();
+}
+
+// ------------------------------------------------------------ live updates
+//
+// State arrives over the shared WebSocket (live.js). Polling survives only as a
+// fallback: while the socket is down or was never available (the legacy Flask server
+// has no /ws), and, at a slower seats-only pace, while a human seat is still open,
+// because taking a seat is not pushed over the socket.
+
+function hasOpenSeat() {
+  return mode === 'human' && !!seats && [1, 2].some((p) => seats[p].kind === 'human' && seats[p].name === null);
+}
+
+function needsPolling() {
+  return !over && (!wsLive || hasOpenSeat());
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function syncPolling() {
+  if (needsPolling()) {
+    if (!pollTimer) pollTimer = setInterval(pollOnce, 1000);
+  } else {
+    stopPolling();
+  }
 }
 
 // Spectators must never keep a game's idle timer alive just by polling it
@@ -631,38 +670,86 @@ function gamePollUrl() {
   return ctx.token ? `/api/game/${gid}?seat_token=${encodeURIComponent(ctx.token)}` : `/api/game/${gid}`;
 }
 
-function startPolling() {
-  pollTimer = setInterval(async () => {
-    if (over) {
-      clearInterval(pollTimer);
+async function pollOnce() {
+  if (over) {
+    syncPolling();
+    return;
+  }
+  try {
+    const data = await ui.api(gamePollUrl());
+    const prevOpen = hasOpenSeat();
+    if (wsLive) {
+      // The socket owns the board; this poll only learns who sits where.
+      seats = data.seats;
+      ctx = computeSeatContext();
+      renderStrips();
+      renderBadge();
+      maybeOfferJoin();
+      if (prevOpen && !hasOpenSeat()) ensureSubscribed();   // someone joined: refresh snapshot
+      syncPolling();
       return;
     }
-    try {
-      const data = await ui.api(gamePollUrl());
-      const newLen = (data.state.history || []).length;
-      const oldLen = (state.history || []).length;
-      const changed = newLen !== oldLen || data.state.winner !== state.winner || data.over !== over;
-      // Seats (a name filling an open seat) don't move history/winner, so they're
-      // refreshed every tick regardless — cheap, and it's how the other browser
-      // finds out someone joined. The heavier path (board re-render, re-running
-      // the join/result/bot side effects) is reserved for an actual game change.
-      seats = data.seats;
-      if (changed) {
-        onGameData(data);
-      } else {
-        ctx = computeSeatContext();
-        renderStrips();
-        renderBadge();
-        maybeOfferJoin();
-        maybeBotMove();
-      }
-    } catch (e) {
-      if (e && e.status === 404) {
-        clearInterval(pollTimer);
-        showExpired();
-      }
+    const newLen = (data.state.history || []).length;
+    const oldLen = (state.history || []).length;
+    const changed = newLen !== oldLen || data.state.winner !== state.winner || data.over !== over;
+    // Seats (a name filling an open seat) don't move history/winner, so they're
+    // refreshed every tick regardless. The heavier path (board re-render, re-running
+    // the join/result/bot side effects) is reserved for an actual game change.
+    seats = data.seats;
+    if (changed) {
+      onGameData(data);
+    } else {
+      ctx = computeSeatContext();
+      renderStrips();
+      renderBadge();
+      maybeOfferJoin();
+      maybeBotMove();
+      syncPolling();
     }
-  }, 1000);
+  } catch (e) {
+    if (e && e.status === 404) showExpired();
+  }
+}
+
+function sameShown(a, b) {
+  return a.winner === b.winner && a.current_player === b.current_player
+    && a.bonus_turn === b.bonus_turn && a.end_reason === b.end_reason
+    && (a.history || []).length === (b.history || []).length && a.message === b.message
+    && JSON.stringify(a.board) === JSON.stringify(b.board)
+    && JSON.stringify(a.hands) === JSON.stringify(b.hands);
+}
+
+function onSocketState(msg) {
+  if (!state) return;                 // the first HTTP load hasn't landed yet
+  wsLive = true;
+  // `ply` is just len(history), not a version: undo/redo (from any tab) legitimately lowers
+  // it, and pushes arrive in order on one socket, so every push is accepted; exact
+  // duplicates are dropped by sameShown below.
+  lastPly = msg.ply;
+  if (!sameShown(state, msg.state)) {
+    const moved = (state.history || []).length !== (msg.state.history || []).length;
+    state = msg.state;
+    over = !!msg.over || (state.winner !== null && state.winner !== undefined);
+    ctx = computeSeatContext();
+    if (moved) clearSelection();
+    publishDebugHook();
+    renderAll();
+    maybeShowResultSheet();
+    // No maybeBotMove() here: over the socket the server owns the bot reply, and a push
+    // lands between the human move and the bot's, so asking for a bot move now would race it.
+  }
+  syncPolling();
+}
+
+function ensureSubscribed() {
+  if (!window.MushiLive) return;
+  const token = ctx.token || null;
+  window.MushiLive.subscribeGame(gid, token, onSocketState, {
+    // A (re)connect delivers a fresh snapshot, which is authoritative even if its ply
+    // is lower than what we last showed (e.g. an undo done from another tab).
+    onUp: () => { lastPly = -1; },
+    onDown: () => { wsLive = false; syncPolling(); },
+  });
 }
 
 async function init() {
@@ -675,7 +762,7 @@ async function init() {
     const url = stored ? `/api/game/${gid}?seat_token=${encodeURIComponent(stored.token)}` : `/api/game/${gid}`;
     const data = await ui.api(url);
     onGameData(data);
-    startPolling();
+    ensureSubscribed();
   } catch (e) {
     showExpired();
   }

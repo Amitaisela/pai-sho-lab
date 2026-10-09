@@ -2,7 +2,6 @@ import os
 import sys
 import json
 import hmac
-import random
 import subprocess
 import threading
 from functools import wraps
@@ -34,9 +33,10 @@ from PythonEngine.PaiShoGame import (PaiShoGame, VALID_SPACES, GATES, CENTER, FL
 from PythonEngine.notation import game_to_psn, psn_to_game
 from engine_select import DEFAULT_ENGINE, engine_name_of, game_class
 from Agents.registry import get_agent, playable_agents, trainable_agents
-from Agents.agent_loader import instantiate, act
 from Agents import elo
 from ui import play
+# _clamp_params is not used here; tests/test_integration.py reaches it as srv._clamp_params
+from ui.bots import BotCache, clamp_params as _clamp_params, choose_action as _bot_choose_action  # noqa: F401
 
 _FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'frontend'))
 
@@ -180,7 +180,7 @@ def _push_snapshot(gid, snapshot):
     stacks['undo'].append(snapshot)
     stacks['redo'].clear()
 
-_bot_agents = {}
+_bot_cache = BotCache()
 
 
 def _lab_gate_gid(gid):
@@ -725,87 +725,6 @@ def api_redo(gid):
                     'can_redo': len(stacks['redo']) > 0})
 
 
-def _clamp_params(entry, params):
-    """Clamp every numeric value in `params` to its registry play_param's
-    min/max (e.g. time_budget <= 30), so a client-supplied value - whether
-    from a slipped-up UI, a stale saved game, or a request crafted by hand -
-    can't force an agent into an arbitrarily expensive search. Unknown keys
-    and non-numeric types pass through untouched; `act()`/the agent's own
-    validation handles those."""
-    if not isinstance(params, dict):
-        return {}
-    out = dict(params)
-    for pd in entry.get("play_params", []):
-        if pd.get("type") != "number":
-            continue
-        k = pd["key"]
-        if k not in out:
-            continue
-        v = out[k]
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
-            continue
-        lo, hi = pd.get("min"), pd.get("max")
-        if lo is not None and v < lo:
-            v = lo
-        if hi is not None and v > hi:
-            v = hi
-        out[k] = v
-    return out
-
-
-def _get_bot_agent(gid, bot_type, params):
-    # Keyed by (gid, bot_type): the cache used to be keyed by bot_type alone,
-    # a global shared across every concurrent tab/game. Since Flask runs
-    # threaded=True, two simultaneous games both using e.g. 'mcts' would
-    # literally share one mutable agent instance (tree/transposition-table
-    # state) with no lock - a data race that could corrupt or leak state
-    # between unrelated games. Scoping by gid gives each tab its own instance.
-    key = (gid, bot_type.lower())
-    if key in _bot_agents:
-        return _bot_agents[key]
-
-    entry = get_agent(bot_type.lower())
-    if not entry or entry["kind"] != "class":
-        return None
-
-    try:
-        agent = instantiate(entry, params=_clamp_params(entry, params))
-    except Exception:
-        return None
-
-    _bot_agents[key] = agent
-    return agent
-
-
-def _bot_choose_action(gid, game, bot_type, params):
-    key = bot_type.lower()
-    legal_actions = game.get_legal_actions()
-    if not legal_actions:
-        return None
-
-    entry = get_agent(key)
-    if not entry:
-        return random.choice(legal_actions)
-
-    params = _clamp_params(entry, params)
-    kind = entry["kind"]
-
-    if kind == "class":
-        agent = _get_bot_agent(gid, key, params)
-        if agent is None:
-            return random.choice(legal_actions)
-        # Every play_param is re-applied each turn, falling back to its own
-        # default when absent, so a stale override never lingers on the
-        # cached agent instance.
-        synced = {pd["key"]: params.get(pd["key"], pd["default"]) for pd in entry.get("play_params", [])}
-        return act(entry, game, agent=agent, params=synced, verbose=False, legal_actions=legal_actions)
-
-    if kind in ("inline", "function"):
-        return act(entry, game, params=params, verbose=False, legal_actions=legal_actions)
-
-    return random.choice(legal_actions)
-
-
 def _forget_game(gid):
     """Drop server-side per-game state for a game play.py evicted."""
     _history_stacks.pop(gid, None)
@@ -813,11 +732,12 @@ def _forget_game(gid):
     _elo_sessions_by_gid.pop(gid, None)
     _recorded_games.discard(gid)
     _last_elo_result.pop(gid, None)
-    for key in [k for k in _bot_agents if k[0] == gid]:
-        _bot_agents.pop(key, None)
+    _bot_cache.drop_game(gid)
 
 
-play.init(games, serialize, game_class, _bot_choose_action, on_evict=_forget_game)
+play.init(games, serialize, game_class,
+          lambda gid, game, bot_type, params: _bot_choose_action(_bot_cache, gid, game, bot_type, params),
+          on_evict=_forget_game)
 app.register_blueprint(play.bp)
 
 _TUTORIAL_STEPS_PATH = os.path.join(_FRONTEND_DIR, 'static', 'tutorial', 'steps.json')
@@ -861,7 +781,7 @@ def api_bot_move(gid):
         bot_type, params = meta['seats'][g.current_player]['bot'], {}
 
     snap = g.clone()
-    action = _bot_choose_action(gid, g, bot_type, params)
+    action = _bot_choose_action(_bot_cache, gid, g, bot_type, params)
     if action is None:
         return jsonify({'error': 'no legal moves', 'state': serialize(g)}), 400
 

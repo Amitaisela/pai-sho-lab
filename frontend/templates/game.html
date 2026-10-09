@@ -15,5 +15,6 @@
   </div>
 {% endblock %}
 {% block scripts %}
+  {% if live_ws %}<script src="/static/js/live.js"></script>{% endif %}
   <script type="module" src="/static/js/game.js"></script>
 {% endblock %}

@@ -108,13 +108,41 @@ async function startQuickMatch(seekId) {
 }
 
 async function refreshSeeksList() {
-  const el = document.getElementById('quick-match-seeks');
-  if (!el) return;
   let rows;
   try {
     rows = await ui.api('/api/seeks');
   } catch (e) {
     return;
+  }
+  renderSeeks(rows);
+}
+
+// Pushed seek rows carry `age_s` as of the moment they were published and are not
+// re-pushed as it ticks, so the age shown is computed here: the age at receipt plus
+// the time since receipt (per seek, so a re-push of the same seek keeps counting).
+const seekFirstSeen = new Map();   // seek_id -> performance.now() - age_s*1000 (its creation, locally)
+
+function seekAgeText(seekId) {
+  const t0 = seekFirstSeen.get(seekId);
+  if (t0 === undefined) return '';
+  const s = Math.max(0, Math.floor((performance.now() - t0) / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m`;
+}
+
+function tickSeekAges() {
+  document.querySelectorAll('#quick-match-seeks .qm-seek-age').forEach((span) => {
+    span.textContent = seekAgeText(span.dataset.seekId);
+  });
+}
+
+function renderSeeks(rows) {
+  const el = document.getElementById('quick-match-seeks');
+  if (!el) return;
+  const now = performance.now();
+  const live = new Set(rows.map((r) => r.seek_id));
+  for (const id of [...seekFirstSeen.keys()]) if (!live.has(id)) seekFirstSeen.delete(id);
+  for (const r of rows) {
+    if (!seekFirstSeen.has(r.seek_id)) seekFirstSeen.set(r.seek_id, now - (Number(r.age_s) || 0) * 1000);
   }
   if (!rows.length) {
     el.hidden = true;
@@ -125,6 +153,7 @@ async function refreshSeeksList() {
   el.innerHTML = rows.map((r) => `
     <li><button type="button" class="qm-seek-item" data-seek-id="${escapeHtml(r.seek_id)}">
       ${escapeHtml(r.nickname)} is waiting &mdash; tap to play
+      <span class="muted qm-seek-age" data-seek-id="${escapeHtml(r.seek_id)}">${seekAgeText(r.seek_id)}</span>
     </button></li>
   `).join('');
   el.querySelectorAll('.qm-seek-item').forEach((btn) => {
@@ -252,14 +281,18 @@ async function playBot() {
 // ---------------------------------------------------------------- live now
 
 async function refreshLive() {
-  const el = document.getElementById('live-list');
-  if (!el) return;
   let rows;
   try {
     rows = await ui.api('/api/live');
   } catch (e) {
     return;
   }
+  renderLive(rows);
+}
+
+function renderLive(rows) {
+  const el = document.getElementById('live-list');
+  if (!el) return;
   if (!rows.length) {
     el.innerHTML = '<p class="muted">No games right now &mdash; start one!</p>';
     return;
@@ -347,8 +380,38 @@ function wire() {
   loadHouseBots();
   refreshSeeksList();
   refreshLive();
-  setInterval(refreshSeeksList, 3000);
-  setInterval(refreshLive, 5000);
+  setInterval(tickSeekAges, 1000);   // local clock only, no network
+  startLobbyFeed();
+}
+
+// The lobby lists arrive over the shared WebSocket (live.js), which sends a snapshot
+// on every (re)connect. The old polls come back only while the socket is down or was
+// never available (the legacy Flask server has no /ws). The waiting player's own
+// one-second seek poll (startQuickMatch) is separate and stays as is.
+let lobbyFallbackTimers = [];
+
+function startLobbyFallback() {
+  if (lobbyFallbackTimers.length) return;
+  lobbyFallbackTimers = [setInterval(refreshSeeksList, 3000), setInterval(refreshLive, 5000)];
+}
+
+function stopLobbyFallback() {
+  lobbyFallbackTimers.forEach(clearInterval);
+  lobbyFallbackTimers = [];
+}
+
+function startLobbyFeed() {
+  if (!window.MushiLive) {
+    startLobbyFallback();
+    return;
+  }
+  window.MushiLive.subscribeLobby(
+    { onLive: renderLive, onSeeks: renderSeeks },
+    {
+      onUp: stopLobbyFallback,
+      onDown: () => { startLobbyFallback(); },
+    },
+  );
 }
 
 wire();
