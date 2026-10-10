@@ -11,7 +11,7 @@
 8. Running and benchmarking agents
 9. Tests
 10. Public mirror implications
-11. Player-facing endpoints (`backend/ui/play.py`) and the seat-token rule
+11. Player-facing endpoints (moved to the site) and the seat-token rule
 
 ## 1. Importing the engine and choosing Python or Rust
 `pyproject.toml` puts `engine/` and `backend/` on the package path, so after `pip install -e .`:
@@ -179,7 +179,7 @@ Reference templates to copy: `Agents/classical/basic_minimax.py` (weightless) an
 
 ## 8. Running and benchmarking agents
 ```bash
-python backend/ui/server.py                                   # web UI at http://localhost:5000
+python backend/ui/server.py                                   # the Lab at http://127.0.0.1:5001/lab
 python backend/simulator.py --mode local --p1 minimax:time_budget=5 --p2 mcts:time_budget=3,c=0.3 --n 10 --engine rust
 ```
 - Agent specs have the form `key` or `key:k=v,k2=v2`. Values are coerced to int, float or bool, and the keys override `play_params`.
@@ -218,7 +218,9 @@ These use a custom pass/fail runner, not pytest. When you test captures, assert 
   - `README.public.md`, renamed to `README.md`.
 - This skill ships to the mirror too. Keep it free of anything that only makes sense in the private repo, or make those parts clearly optional.
 
-## 11. Player-facing endpoints (`backend/ui/play.py`) and the seat-token rule
+## 11. Player-facing endpoints (moved to the site) and the seat-token rule
+
+> `backend/ui/play.py` was removed in M2.4. The player-facing game registry and seat-token rule below now live in the FastAPI site (`backend/site_app`, port 5000); the Flask Lab on port 5001 has only the Lab routes and gates every mutation with `MUSHIBOT_API_TOKEN`. The text below describes the Phase 1 design the site reimplements.
 
 Phase 1 added `backend/ui/play.py`, a blueprint (imported as `ui.play`, mounted into `server.py`'s app) that owns a second, player-facing game registry separate from the Lab's open `/lab/board`. It tracks, per registered game id: `mode` (`'human'` | `'pass'` | `'bot'`), `seats` (`{1: {...}, 2: {...}}`, each with a `name`, `kind` (`'human'`|`'bot'`), and — for a human seat in a `'human'`-mode game only — a secret `token`), plus `created`/`last_active` for idle eviction (`IDLE_SECONDS = 1800`) and a per-IP create rate limit (`RATE_LIMIT = (20, 60)`).
 

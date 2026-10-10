@@ -617,7 +617,7 @@
         <a href="/lab/train" class="btn" style="text-decoration:none;">Train</a>
         <a href="/lab/simulate" class="btn" style="text-decoration:none;">Simulate</a>
         <a href="/lab/leaderboard" class="btn" style="text-decoration:none;">Leaderboard</a>
-        <a href="/learn" class="btn" style="text-decoration:none;">Rules</a>
+        <a href="/lab/rules" class="btn" style="text-decoration:none;">Rules</a>
         <a href="/lab/guide" class="btn" style="text-decoration:none;">Guide</a>
     </nav>
     <div class="header-actions">
@@ -664,7 +664,7 @@
             <em>Plant</em> at a Gate, then <em>Arrange</em> your tiles.<br>
             Pair circle-neighbours to form a <em>Harmony</em>.<br>
             <em>Win</em>: ring the center with your harmonies.
-            <div style="margin-top:6px;"><a href="/learn" style="color:var(--link);text-decoration:none;">Full rules →</a></div>
+            <div style="margin-top:6px;"><a href="/lab/rules" style="color:var(--link);text-decoration:none;">Full rules →</a></div>
         </div>
     </div>
 
@@ -868,9 +868,8 @@
     }
 
     async function post(url, body={}) {
-      // Lab game APIs are gated behind MUSHIBOT_API_TOKEN (server.py's
-      // _lab_gate_gid) for every gid that isn't a registered player game -
-      // which every Lab-created game is. Send the owner's token, the same
+      // Every mutating Lab API is gated behind MUSHIBOT_API_TOKEN (server.py).
+      // Send the owner's token, the same
       // key ui.js's setLabToken()/labCheck() use, so the Lab keeps working
       // once a token is configured.
       const token = (() => { try { return localStorage.getItem('mushibot_api_token') || ''; } catch { return ''; } })();

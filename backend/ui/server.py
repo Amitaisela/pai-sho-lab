@@ -4,6 +4,7 @@ import json
 import hmac
 import subprocess
 import threading
+from collections import defaultdict
 from functools import wraps
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -34,7 +35,6 @@ from PythonEngine.notation import game_to_psn, psn_to_game
 from engine_select import DEFAULT_ENGINE, engine_name_of, game_class
 from Agents.registry import get_agent, playable_agents, trainable_agents
 from Agents import elo
-from ui import play
 # _clamp_params is not used here; tests/test_integration.py reaches it as srv._clamp_params
 from ui.bots import BotCache, clamp_params as _clamp_params, choose_action as _bot_choose_action  # noqa: F401
 
@@ -58,29 +58,6 @@ def _handle_bad_request(e):
 
 _VALID_SET = set(VALID_SPACES)
 _KNOWN_TILES = set(FLOWER) | set(SPECIAL_TILES) | set(ACCENT_TILES)
-
-_API_TOKEN = os.environ.get('MUSHIBOT_API_TOKEN', '').strip()
-
-
-def _require_api_token(view):
-    """Gate a state-mutating endpoint behind MUSHIBOT_API_TOKEN, if set.
-
-    Training/simulation start-stop and config writes had no access control
-    beyond network position: fine for a laptop, not fine for the Tailscale
-    deployment this app documents, where anyone reachable on the tailnet -
-    not just the intended operator - could stop someone else's training run
-    or overwrite their hyperparameter config. Leaving MUSHIBOT_API_TOKEN
-    unset keeps the previous (open) behavior for local single-user use.
-    """
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if _API_TOKEN:
-            supplied = request.headers.get('X-API-Token', '')
-            if not hmac.compare_digest(supplied, _API_TOKEN):
-                return jsonify({'error': 'unauthorized'}), 401
-        return view(*args, **kwargs)
-    return wrapped
-
 
 def _json_body(*required):
     d = request.get_json(silent=True)
@@ -183,62 +160,40 @@ def _push_snapshot(gid, snapshot):
 _bot_cache = BotCache()
 
 
-def _lab_gate_gid(gid):
-    """401 unless `gid` is a registered player game (play.META) or no API
-    token is configured. Lab/legacy games (any gid outside play.META) used to
-    be reachable by anyone who guessed or was handed the id - new_game,
-    bot_move, set_agents, set_state/load/import_psn, undo/redo, plant/
-    arrange/skip_bonus/resign and elo/session(POST) all mutate server state
-    (including, via api_state's _maybe_record_elo, the Elo leaderboard) with
-    no access control beyond network position otherwise. Registered player
-    games keep their own seat-token rules unchanged - this never fires for
-    them, token configured or not.
-    """
-    if gid in play.META:
-        return None
-    # Read live rather than the frozen _API_TOKEN snapshot (unlike
-    # _require_api_token, which only ever runs with the token the process
-    # started with) so this matches play.py's api_lab_check, which the Lab
-    # gate's own UI polls dynamically.
+def _require_token():
+    """None when the caller may proceed, else a 401 response. Read live from the
+    environment so a token set after import (and the Lab gate's own polling) agree."""
     expected = os.environ.get('MUSHIBOT_API_TOKEN', '').strip()
     if not expected:
         return None
     supplied = request.headers.get('X-API-Token', '')
-    if not hmac.compare_digest(supplied, expected):
+    if not hmac.compare_digest(supplied.encode(), expected.encode()):
         return jsonify({'error': 'unauthorized'}), 401
     return None
 
 
-def _seat_guard(action):
-    """Run play.guard() before a mutating endpoint, under the game's lock.
+_game_locks = defaultdict(threading.Lock)
 
-    Registered player games (play.META) are locked to their seat tokens; Lab and
-    legacy games (any other gid) require the API token instead, when one is
-    configured (see _lab_gate_gid). The gid comes from the URL, or from the
-    body for /api/new_game. A successful mutation refreshes the game's idle
-    timer.
-    """
-    def deco(view):
-        @wraps(view)
-        def wrapped(*args, **kwargs):
-            body = request.get_json(silent=True)
-            if not isinstance(body, dict):
-                body = {}
-            gid = kwargs.get('gid') or body.get('gid') or 'default'
-            blocked = _lab_gate_gid(gid)
-            if blocked:
-                return blocked
-            with play.game_lock(gid):
-                err = play.guard(gid, action, body)
-                if err:
-                    return err
-                resp = view(*args, **kwargs)
-            status = resp[1] if isinstance(resp, tuple) else getattr(resp, 'status_code', 200)
-            if status < 400:
-                play.touch(gid)
-            return resp
-        return wrapped
-    return deco
+
+def _game_lock(gid):
+    return _game_locks[gid]
+
+
+def _lab_guard(view):
+    """Every mutating Lab endpoint needs the Lab token when one is configured.
+    Player games live in the site now; the Lab board's games are admin games."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        blocked = _require_token()
+        if blocked:
+            return blocked
+        body = request.get_json(silent=True)
+        gid = kwargs.get('gid') or (body.get('gid') if isinstance(body, dict) else None)
+        if not gid:
+            return view(*args, **kwargs)
+        with _game_lock(gid):
+            return view(*args, **kwargs)
+    return wrapped
 
 
 def serialize(game: PaiShoGame) -> dict:
@@ -273,32 +228,34 @@ def serialize(game: PaiShoGame) -> dict:
 
 @app.route('/')
 def root():
-    return render_template('home.html')
+    return redirect('/lab', code=302)
 
 
-@app.route('/game/<gid>')
-def game_page(gid):
-    return render_template('game.html', gid=gid)
-
-
-@app.route('/learn')
-def learn_page():
-    return render_template('learn.html')
-
-
-@app.route('/bots')
-def bots_page():
-    return render_template('bots.html')
-
-
-@app.route('/developers')
-def developers_page():
-    return render_template('developers.html')
+def lab_bind():
+    return os.environ.get('LAB_HOST', '127.0.0.1'), int(os.environ.get('LAB_PORT', '5001'))
 
 
 @app.route('/lab')
 def lab_index_page():
     return render_template('lab/index.html')
+
+
+@app.route('/api/lab/check', methods=['GET'])
+def api_lab_check():
+    """Always 200 (ok says whether this browser holds the token; token_required
+    says whether one is configured). lab_gate.js uses it to gate /lab."""
+    expected = os.environ.get('MUSHIBOT_API_TOKEN', '').strip()
+    if not expected:
+        return jsonify({'ok': False, 'token_required': False})
+    supplied = request.headers.get('X-API-Token', '')
+    if hmac.compare_digest(supplied.encode(), expected.encode()):
+        return jsonify({'ok': True})
+    return jsonify({'ok': False, 'token_required': True})
+
+
+@app.route('/lab/rules')
+def lab_rules_page():
+    return render_template('lab/rules.html')
 
 
 @app.route('/lab/board')
@@ -307,7 +264,7 @@ def lab_board_page():
 
 
 @app.route('/api/new_game', methods=['POST'])
-@_seat_guard('new_game')
+@_lab_guard
 def api_new_game():
     d = _optional_json_body()
     gid = d.get('gid') or 'default'
@@ -338,8 +295,6 @@ def _resolve_agent_key(gid, slot):
 
 
 def _maybe_record_elo(gid, game):
-    if gid in play.META:          # player games (human/pass/bot) are never rated in Phase 1
-        return
     if gid in _recorded_games:
         return
     if game.winner is None:
@@ -375,7 +330,7 @@ def api_state(gid):
 
 
 @app.route('/api/plant/<gid>', methods=['POST'])
-@_seat_guard('move')
+@_lab_guard
 def api_plant(gid):
     g = games.get(gid)
     if not g:
@@ -402,7 +357,7 @@ def api_plant(gid):
 
 
 @app.route('/api/arrange/<gid>', methods=['POST'])
-@_seat_guard('move')
+@_lab_guard
 def api_arrange(gid):
     g = games.get(gid)
     if not g:
@@ -424,7 +379,7 @@ def api_arrange(gid):
 
 
 @app.route('/api/skip_bonus/<gid>', methods=['POST'])
-@_seat_guard('move')
+@_lab_guard
 def api_skip_bonus(gid):
     g = games.get(gid)
     if not g:
@@ -441,14 +396,14 @@ def api_skip_bonus(gid):
 
 
 @app.route('/api/resign/<gid>', methods=['POST'])
-@_seat_guard('resign')
+@_lab_guard
 def api_resign(gid):
     g = games.get(gid)
     if not g:
         return jsonify({'error': 'not found'}), 404
     d = _optional_json_body()
     # In a seated game the default is the caller's own seat, never "whoever is to move".
-    default = play.seat_of(gid, d) or g.current_player
+    default = g.current_player
     player = _require_int(d.get('player', default), 'player')
     snap = g.clone()
     try:
@@ -460,6 +415,7 @@ def api_resign(gid):
 
 
 @app.route('/api/valid_moves/<gid>', methods=['POST'])
+@_lab_guard
 def api_valid_moves(gid):
     g = games.get(gid)
     if not g:
@@ -478,6 +434,7 @@ def api_valid_moves(gid):
 
 
 @app.route('/api/valid_boat_displacement/<gid>', methods=['POST'])
+@_lab_guard
 def api_valid_boat_displacement(gid):
     g = games.get(gid)
     if not g:
@@ -491,6 +448,7 @@ def api_valid_boat_displacement(gid):
 
 
 @app.route('/api/valid_plant_moves/<gid>', methods=['POST'])
+@_lab_guard
 def api_valid_plant_moves(gid):
     g = games.get(gid)
     if not g:
@@ -506,7 +464,7 @@ def api_valid_plant_moves(gid):
 
 
 @app.route('/api/set_state/<gid>', methods=['POST'])
-@_seat_guard('set_state')
+@_lab_guard
 def api_set_state(gid):
     d = _json_body('board', 'hands', 'current_player')
     try:
@@ -517,12 +475,10 @@ def api_set_state(gid):
 
 
 @app.route('/api/set_agents', methods=['POST'])
+@_lab_guard
 def api_set_agents():
     d = _optional_json_body()
     gid = d.get('gid') or 'default'
-    blocked = _lab_gate_gid(gid)
-    if blocked:
-        return blocked
     names = _get_agent_names(gid)
     names['1'] = d.get('p1', 'Player 1')
     names['2'] = d.get('p2', 'Player 2')
@@ -575,11 +531,11 @@ def api_elo_rating():
 @app.route('/api/elo/session', methods=['GET', 'POST'])
 def api_elo_session():
     if request.method == 'POST':
-        d = _optional_json_body()
-        gid = d.get('gid') or 'default'
-        blocked = _lab_gate_gid(gid)
+        blocked = _require_token()
         if blocked:
             return blocked
+        d = _optional_json_body()
+        gid = d.get('gid') or 'default'
         session = _get_elo_session(gid)
         for field in ('p1_key', 'p2_key', 'p1_human_name', 'p2_human_name'):
             if field in d:
@@ -628,7 +584,7 @@ def api_export_psn(gid):
 
 
 @app.route('/api/import_psn/<gid>', methods=['POST'])
-@_seat_guard('set_state')
+@_lab_guard
 def api_import_psn(gid):
     text = None
     requested_engine = DEFAULT_ENGINE
@@ -659,7 +615,7 @@ def api_import_psn(gid):
 
 
 @app.route('/api/load/<gid>', methods=['POST'])
-@_seat_guard('set_state')
+@_lab_guard
 def api_load_game(gid):
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or 'state' not in data:
@@ -677,18 +633,8 @@ def api_load_game(gid):
     return jsonify({'state': serialize(games[gid])})
 
 
-def _is_bot_turn(gid, game):
-    """True when `gid` is a registered bot game and its bot seat is to move -
-    undo/redo there skip past bot plies so one tap returns to the human's turn."""
-    meta = play.META.get(gid)
-    if not meta or meta['mode'] != 'bot' or game.winner is not None:
-        return False
-    seat = meta['seats'].get(game.current_player)
-    return bool(seat and seat['kind'] == 'bot')
-
-
 @app.route('/api/undo/<gid>', methods=['POST'])
-@_seat_guard('undo')
+@_lab_guard
 def api_undo(gid):
     stacks = _history_stacks.get(gid)
     if not stacks or not stacks['undo']:
@@ -698,16 +644,13 @@ def api_undo(gid):
         return jsonify({'error': 'not found'}), 404
     stacks['redo'].append(g.clone())
     games[gid] = stacks['undo'].pop()
-    while _is_bot_turn(gid, games[gid]) and stacks['undo']:
-        stacks['redo'].append(games[gid])
-        games[gid] = stacks['undo'].pop()
     return jsonify({'state': serialize(games[gid]),
                     'can_undo': len(stacks['undo']) > 0,
                     'can_redo': len(stacks['redo']) > 0})
 
 
 @app.route('/api/redo/<gid>', methods=['POST'])
-@_seat_guard('undo')
+@_lab_guard
 def api_redo(gid):
     stacks = _history_stacks.get(gid)
     if not stacks or not stacks['redo']:
@@ -717,54 +660,13 @@ def api_redo(gid):
         return jsonify({'error': 'not found'}), 404
     stacks['undo'].append(g.clone())
     games[gid] = stacks['redo'].pop()
-    while _is_bot_turn(gid, games[gid]) and stacks['redo']:
-        stacks['undo'].append(games[gid])
-        games[gid] = stacks['redo'].pop()
     return jsonify({'state': serialize(games[gid]),
                     'can_undo': len(stacks['undo']) > 0,
                     'can_redo': len(stacks['redo']) > 0})
 
 
-def _forget_game(gid):
-    """Drop server-side per-game state for a game play.py evicted."""
-    _history_stacks.pop(gid, None)
-    _agent_names_by_gid.pop(gid, None)
-    _elo_sessions_by_gid.pop(gid, None)
-    _recorded_games.discard(gid)
-    _last_elo_result.pop(gid, None)
-    _bot_cache.drop_game(gid)
-
-
-play.init(games, serialize, game_class,
-          lambda gid, game, bot_type, params: _bot_choose_action(_bot_cache, gid, game, bot_type, params),
-          on_evict=_forget_game)
-app.register_blueprint(play.bp)
-
-_TUTORIAL_STEPS_PATH = os.path.join(_FRONTEND_DIR, 'static', 'tutorial', 'steps.json')
-_tutorial_steps_cache = None
-
-
-def _tutorial_steps():
-    global _tutorial_steps_cache
-    if _tutorial_steps_cache is None:
-        with open(_TUTORIAL_STEPS_PATH, encoding='utf-8') as f:
-            _tutorial_steps_cache = json.load(f)
-    return _tutorial_steps_cache
-
-
-@app.route('/api/tutorial/<int:n>', methods=['POST'])
-def api_tutorial(n):
-    steps = _tutorial_steps()
-    if not 1 <= n <= len(steps):
-        return jsonify({'error': 'no such tutorial step'}), 404
-    gid, err = play.create_tutorial_game(steps[n - 1]['state'])
-    if err:
-        return err
-    return jsonify({'game_id': gid})
-
-
 @app.route('/api/bot_move/<gid>', methods=['POST'])
-@_seat_guard('bot_move')
+@_lab_guard
 def api_bot_move(gid):
     g = games.get(gid)
     if not g:
@@ -775,10 +677,6 @@ def api_bot_move(gid):
     d = _optional_json_body()
     bot_type = d.get('bot', 'random')
     params = d.get('params', {})
-    meta = play.META.get(gid)
-    if meta is not None:
-        # A house-bot game always plays its own seat's bot; the client can't swap it.
-        bot_type, params = meta['seats'][g.current_player]['bot'], {}
 
     snap = g.clone()
     action = _bot_choose_action(_bot_cache, gid, g, bot_type, params)
@@ -841,13 +739,6 @@ def guide_page():
     return send_from_directory(os.path.join(_FRONTEND_DIR, 'templates', 'lab'), 'guide.html')
 
 
-@app.route('/rules')
-def rules_page_redirect():
-    # rules.html's content now lives, restyled, inside learn.html; this just
-    # stops linking to the old URL.
-    return redirect('/learn', code=301)
-
-
 @app.route('/api/example/<filename>')
 def download_example(filename):
     ALLOWED = {
@@ -864,7 +755,7 @@ def download_example(filename):
 
 
 @app.route('/api/training/start', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_training_start():
     d = _optional_json_body()
     model = d.get('model')
@@ -877,7 +768,7 @@ def api_training_start():
 
 
 @app.route('/api/training/stop', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_training_stop():
     return jsonify(stop_training())
 
@@ -947,7 +838,7 @@ def api_training_config_read():
 
 
 @app.route('/api/training/config', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_training_config_write():
     d = _optional_json_body()
     model = d.get('model', '')
@@ -995,7 +886,7 @@ def simulate_page():
 
 
 @app.route('/api/simulate/start', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_simulate_start():
     d = _optional_json_body()
     try:
@@ -1019,7 +910,7 @@ def api_simulate_start():
 
 
 @app.route('/api/simulate/stop', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_simulate_stop():
     return jsonify(stop_simulation())
 
@@ -1069,7 +960,7 @@ _test_state = {
 
 
 @app.route('/api/tests/run', methods=['POST'])
-@_require_api_token
+@_lab_guard
 def api_tests_run():
     with _test_state["lock"]:
         if _test_state["status"] == "running":
@@ -1129,18 +1020,30 @@ def add_cache_headers(response):
     return response
 
 
+def open_bind_warning(host):
+    """Loud text when the Lab is bound beyond loopback with no API token, else ''."""
+    if host in ('127.0.0.1', 'localhost', '::1') or os.environ.get('MUSHIBOT_API_TOKEN', '').strip():
+        return ''
+    bar = "!" * 72
+    return (f"\n{bar}\nWARNING: the Lab is binding {host!r} (not loopback) with NO MUSHIBOT_API_TOKEN.\n"
+            "Anyone who can reach this port can start training/simulation runs and overwrite\n"
+            f"config. Set MUSHIBOT_API_TOKEN, or bind LAB_HOST=127.0.0.1.\n{bar}\n")
+
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    host = os.environ.get('HOST', '127.0.0.1')
+    host, port = lab_bind()
     debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes')
     if debug and host not in ('127.0.0.1', 'localhost'):
         # Werkzeug's interactive debugger is remote code execution if it's
         # reachable from anywhere but localhost (e.g. the Tailscale-exposed
-        # Docker deployment binds HOST=0.0.0.0). Refuse rather than trust
+        # Docker deployment binds LAB_HOST=0.0.0.0). Refuse rather than trust
         # the env var blindly.
-        print(f"WARNING: FLASK_DEBUG is set but HOST={host!r} is not loopback; "
-              f"refusing to enable the interactive debugger. Set HOST=127.0.0.1 "
+        print(f"WARNING: FLASK_DEBUG is set but LAB_HOST={host!r} is not loopback; "
+              f"refusing to enable the interactive debugger. Set LAB_HOST=127.0.0.1 "
               f"to use debug mode.")
         debug = False
-    print(f"\nSkud Pai Sho running at http://{host}:{port}\n")
+    warning = open_bind_warning(host)
+    if warning:
+        print(warning)
+    print(f"\nPai Sho Lab running at http://{host}:{port}\n")
     app.run(debug=debug, use_reloader=False, port=port, host=host, threaded=True)

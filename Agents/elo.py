@@ -62,7 +62,14 @@ def _migrate_legacy_files():
             os.replace(legacy, dest)
 
 
+def _use_pg():
+    return os.environ.get('ELO_STORE') == 'postgres'
+
+
 def _load_ratings():
+    if _use_pg():
+        from Agents import elo_pg
+        return elo_pg.load_ratings()
     global _ratings_cache, _ratings_mtime
     cur = _file_mtime(RATINGS_PATH)
     if _ratings_cache is not None and cur == _ratings_mtime:
@@ -73,6 +80,9 @@ def _load_ratings():
 
 
 def _save_ratings(ratings):
+    if _use_pg():
+        from Agents import elo_pg
+        return elo_pg.save_ratings(ratings)
     global _ratings_cache, _ratings_mtime
     try:
         _atomic_write(RATINGS_PATH, ratings)
@@ -85,6 +95,9 @@ def _save_ratings(ratings):
 
 
 def _load_history():
+    if _use_pg():
+        from Agents import elo_pg
+        return elo_pg.load_history()
     global _history_cache, _history_mtime
     cur = _file_mtime(HISTORY_PATH)
     if _history_cache is not None and cur == _history_mtime:
@@ -95,6 +108,9 @@ def _load_history():
 
 
 def _append_history(entry):
+    if _use_pg():
+        from Agents import elo_pg
+        return elo_pg.append_history(entry)
     global _history_cache, _history_mtime
     history = _load_history()
     history.append(entry)

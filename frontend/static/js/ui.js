@@ -176,7 +176,23 @@ function toggleTheme() {
   return next;
 }
 
+// Lab pages set <body data-chrome="lab"> and get the Lab's own menu: the player-facing
+// pages (/learn, /bots, /developers) live on the site, not on the Lab server.
 function menuHtml() {
+  if (document.body.dataset.chrome === 'lab') {
+    return `
+    <div class="menu-list">
+      <a href="/lab/board">Board</a>
+      <a href="/lab/train">Train</a>
+      <a href="/lab/simulate">Simulate</a>
+      <a href="/lab/leaderboard">Leaderboard</a>
+      <a href="/lab/rules">Rules</a>
+      <a href="/lab/guide">Guide</a>
+      <div class="menu-sep"></div>
+      <button type="button" id="menu-theme-btn"></button>
+    </div>
+  `;
+  }
   return `
     <div class="menu-list">
       <a href="/">Play</a>

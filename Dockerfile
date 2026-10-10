@@ -23,5 +23,6 @@ RUN pip install --no-cache-dir -r requirements.txt \
  && (cd engine/RustEngine/crates/pybind && maturin build --release) \
  && pip install --no-cache-dir engine/RustEngine/target/wheels/*.whl
 ENV HOST=0.0.0.0
-EXPOSE 5000
+EXPOSE 5001
+ENV LAB_HOST=0.0.0.0
 CMD ["python", "backend/ui/server.py"]

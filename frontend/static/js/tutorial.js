@@ -252,7 +252,7 @@ async function doMove(kind, body) {
 // report's race: a fast double-click used to fire two overlapping
 // `startStep()` calls, each minting its own tutorial game, which could run
 // a learner straight into the per-IP live-game cap (fixed server-side too -
-// see play.py's create_tutorial_game) and always left a stray game behind.
+// see the site's create_tutorial_game) and always left a stray game behind.
 function setStepControlsBusy(busy) {
   startBtn.disabled = busy;
   resetBtn.disabled = busy;

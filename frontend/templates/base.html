@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="/static/css/pai.css">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
   <header class="topbar">
     <a class="topbar__brand" href="/">
       <img class="topbar__logo" src="/static/tiles/GL.png" alt="" width="28" height="28">

@@ -9,15 +9,22 @@ services:
       - tailscale-state:/var/lib/tailscale
     cap_add: [NET_ADMIN, NET_RAW]
     ports:
-      - "5000:5000"
+      # Host-local only; tailnet peers reach mushibot:5001 (the Lab) through this sidecar.
+      - "127.0.0.1:5001:5001"
     restart: unless-stopped
 
-  backend:
+  # The Lab (Flask, backend/ui/server.py): board vs reference bots, simulate, train,
+  # leaderboard. Tailnet-only (shares the sidecar's network) and gated by its token:
+  # compose refuses to start it without MUSHIBOT_API_TOKEN. Owns the GPU reservation.
+  lab:
     build: .
+    command: ["python", "backend/ui/server.py"]
     network_mode: service:tailscale
     depends_on: [tailscale]
     environment:
-      - MUSHIBOT_API_TOKEN=${MUSHIBOT_API_TOKEN:-}
+      - LAB_HOST=0.0.0.0
+      - LAB_PORT=5001
+      - MUSHIBOT_API_TOKEN=${MUSHIBOT_API_TOKEN:?set MUSHIBOT_API_TOKEN for the Lab}
     volumes:
       - ./data:/app/data
     deploy:

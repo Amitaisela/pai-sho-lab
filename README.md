@@ -23,7 +23,7 @@ cd pai-sho-lab
 python -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -e . && pip install -r requirements.txt
-python backend/ui/server.py       # then open http://localhost:5000
+python backend/ui/server.py       # then open http://127.0.0.1:5001/lab
 ```
 
 Everything else happens in the browser.
@@ -38,19 +38,16 @@ Everything else happens in the browser.
 - **Clash:** opposites (R3/W3, R4/W4, R5/W5). A move may never line them up, even if uncovering one. You capture an enemy basic flower that clashes with yours by landing on it; captured tiles leave the game for good.
 - **Bonus:** an Arrange that creates a new harmony earns one optional bonus — place an accent tile (Rock, Wheel, Knotweed, Boat), plant a special flower (White Lotus, Orchid), or (if none of yours are growing) plant a basic flower — or skip it.
 
-Full rules are on the **Learn** page (`/learn`) in the app. Developers who use Claude Code also get a rules and engine reference skill at [.claude/skills/skud-pai-sho/](.claude/skills/skud-pai-sho/SKILL.md). The engine now matches the official rulebook closely; the skill lists the few remaining intentional differences.
+Full rules are on the Lab's rules page. Developers who use Claude Code also get a rules and engine reference skill at [.claude/skills/skud-pai-sho/](.claude/skills/skud-pai-sho/SKILL.md). The engine now matches the official rulebook closely; the skill lists the few remaining intentional differences.
 
 ## I want to play
 
-Open http://localhost:5000. The home page (`/`) puts playing another person first:
+Open http://127.0.0.1:5001/lab. The Lab's **Play** tab is a board where you play a reference bot, watch two agents play each other, or play both sides yourself.
 
-1. **Quick match** pairs you with the next person looking for a game, **Challenge a friend** gives you a link (`/game/<id>`) to send them, and **Pass and play** is one device, two players.
+1. Pick the two sides (Human, or any agent in the dropdown) and the rules engine, then start.
 2. Click a tile, then one of its highlighted destinations to move.
-3. **Play MushiBot** (secondary row, or `/bots`) plays a house bot instead — the full site has six levels; this kit ships two (see [Agents that ship here](#agents-that-ship-here)).
 
-**Everything in this version is unrated** — no Elo, accounts, or clock yet. `/learn` has the rules plus a short interactive tutorial for newcomers.
-
-If you're running this on a private network (e.g. a Tailscale tailnet via [Docker](#running-with-docker)), anyone on it can open the same URL and use Quick match or a challenge link to play you directly; the seat they land in is tied to a token in their browser's `localStorage`, so reloading the page keeps their seat.
+Everything here is unrated. Besides Play, the Lab has **Simulate**, **Train**, and **Leaderboard** tabs, plus a guide for adding an agent. If you run this on a private network (e.g. a Tailscale tailnet via [Docker](#running-with-docker)), only that network can reach it.
 
 **Engine: Python/Rust** — new games use the Rust engine automatically once it's built (see [Engines](#engines)); otherwise they fall back to Python.
 
@@ -197,7 +194,9 @@ docker compose up                                                   # GPU (NVIDI
 docker compose -f docker-compose.yml -f docker-compose.cpu.yml up   # CPU only
 ```
 
-This runs the app plus a Tailscale sidecar. The app is reachable at `http://localhost:5000` and at `http://mushibot:5000` from your tailnet; nothing is exposed publicly. `./data` is mounted, so weights and results persist. The image builds the Rust engine for you. To stop anyone else on your tailnet from starting training or simulation runs, set `MUSHIBOT_API_TOKEN` in `.env`, then visit `/train?api_token=<value>` once per browser.
+This runs the app plus a Tailscale sidecar. The Lab is reachable at `http://localhost:5001/lab` and at `http://mushibot:5001/lab` from your tailnet; nothing is exposed publicly. `./data` is mounted, so weights and results persist. The image builds the Rust engine for you. `MUSHIBOT_API_TOKEN` in `.env` is required: it stops anyone else on your tailnet from starting training or simulation runs. Visit `/lab/train?api_token=<value>` once per browser. The CPU override (`docker-compose.cpu.yml`) needs Docker Compose 2.24 or newer.
+
+The image binds all interfaces (`LAB_HOST=0.0.0.0`), so don't `docker run` it bare on an untrusted network. Use compose (token required, reachable only on loopback and your tailnet), or pass `-e MUSHIBOT_API_TOKEN=<value> -p 127.0.0.1:5001:5001` yourself.
 
 ## Testing
 
@@ -220,8 +219,7 @@ Agents/registry.py       Every agent's UI/training/CLI metadata; the single sour
 Agents/classical/        basic_minimax (weightless template)
 Agents/rl/               cnn_basic (trainable template)
 Agents/training/         Training scripts + shared opponent loader
-backend/ui/server.py     Flask app: home, game, learn, bots, developers pages, plus /lab (board, simulate, train, leaderboard, guide)
-backend/ui/play.py       Player-facing game registry: modes, seat tokens, quick-match seeks, live list
+backend/ui/server.py     Flask Lab at /lab (board, simulate, train, leaderboard, guide)
 backend/simulator.py     Headless game runner
 scripts/new_agent.py     Agent scaffolder
 data/params/             Saved weights

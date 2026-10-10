@@ -194,7 +194,7 @@ function applyFreshState(newState) {
 }
 
 function publishDebugHook() {
-  // A read-only hook for the Playwright checks in tests/e2e_play.py — not
+  // A read-only hook for Playwright checks — not
   // used by the page itself. Harmless to leave in production: it just
   // mirrors module state that's otherwise private to this closure.
   window.__pai = { state, mode, over, ctx };
@@ -664,7 +664,7 @@ function syncPolling() {
 }
 
 // Spectators must never keep a game's idle timer alive just by polling it
-// (see backend/ui/play.py's api_game) - only a seated player's own poll does,
+// (as the old Flask player API did) - only a seated player's own poll does,
 // by sending its seat_token.
 function gamePollUrl() {
   return ctx.token ? `/api/game/${gid}?seat_token=${encodeURIComponent(ctx.token)}` : `/api/game/${gid}`;

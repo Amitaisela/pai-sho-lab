@@ -19,7 +19,16 @@ from Agents.agent_loader import instantiate, act
 from Agents.logging_utils import get_logger, log_event
 from engine_select import DEFAULT_ENGINE, game_class
 
-SERVER_URL = "http://127.0.0.1:5000"
+# --mode flask drives a running Lab: LAB_URL, else http://127.0.0.1:<LAB_PORT or 5001>.
+SERVER_URL = os.environ.get("LAB_URL") or f"http://127.0.0.1:{os.environ.get('LAB_PORT', '5001')}"
+
+
+def _auth_headers():
+    """X-API-Token for the Lab's mutating endpoints, when MUSHIBOT_API_TOKEN is set."""
+    token = os.environ.get("MUSHIBOT_API_TOKEN", "").strip()
+    return {"X-API-Token": token} if token else {}
+
+
 GAME_ID = "default"
 
 log = get_logger("simulator")
@@ -132,13 +141,13 @@ def play_move(action):
         payload = {"flower": flower, "row": r, "col": c}
         if displace is not None:
             payload['displace_row'], payload['displace_col'] = displace
-        res = requests.post(f"{SERVER_URL}/api/plant/{GAME_ID}", json=payload)
+        res = requests.post(f"{SERVER_URL}/api/plant/{GAME_ID}", json=payload, headers=_auth_headers())
     elif kind == 'arrange':
         fr, fc, tr, tc = arrange_parts(action)
         payload = {"from_row": fr, "from_col": fc, "to_row": tr, "to_col": tc}
-        res = requests.post(f"{SERVER_URL}/api/arrange/{GAME_ID}", json=payload)
+        res = requests.post(f"{SERVER_URL}/api/arrange/{GAME_ID}", json=payload, headers=_auth_headers())
     else:
-        res = requests.post(f"{SERVER_URL}/api/skip_bonus/{GAME_ID}")
+        res = requests.post(f"{SERVER_URL}/api/skip_bonus/{GAME_ID}", headers=_auth_headers())
     return res.json()
 
 
@@ -249,7 +258,7 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
     log.info(f"Connecting to Skud Pai Sho server at {SERVER_URL}...")
     log.info(f"Matchup: Player 1 ({p1_spec}) vs Player 2 ({p2_spec})")
 
-    requests.post(f"{SERVER_URL}/api/set_agents", json={"p1": p1_name, "p2": p2_name})
+    requests.post(f"{SERVER_URL}/api/set_agents", json={"p1": p1_name, "p2": p2_name}, headers=_auth_headers())
     agent_p1 = load_model(p1_name, p1_params, verbose)
     agent_p2 = load_model(p2_name, p2_params, verbose)
 
@@ -263,12 +272,12 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
         turn_count = 0
         last_player_turn = None
 
-        requests.post(f"{SERVER_URL}/api/new_game", json={"engine": engine})
+        requests.post(f"{SERVER_URL}/api/new_game", json={"engine": engine}, headers=_auth_headers())
         log.info(f"\n=== Starting Game {i + 1}/{iterations} ===")
 
         while True:
             try:
-                response = requests.get(f"{SERVER_URL}/api/state/{GAME_ID}")
+                response = requests.get(f"{SERVER_URL}/api/state/{GAME_ID}", headers=_auth_headers())
                 state = response.json()['state']
             except Exception as e:
                 log.info(f"Error connecting to server: {e}. Retrying in 2 seconds...")
@@ -345,7 +354,7 @@ def run_flask(iterations, p1_spec, p2_spec, save, delay, verbose,
 
         if save_games and (i + 1) % save_period == 0:
             try:
-                resp = requests.get(f"{SERVER_URL}/api/save/{GAME_ID}")
+                resp = requests.get(f"{SERVER_URL}/api/save/{GAME_ID}", headers=_auth_headers())
                 save_data = resp.json()
                 p1n = p1_spec.split(':')[0]
                 p2n = p2_spec.split(':')[0]

@@ -1,6 +1,6 @@
 services:
-  backend:
+  lab:
     deploy:
       resources:
         reservations:
-          devices: []
+          devices: !reset []
