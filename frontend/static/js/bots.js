@@ -49,7 +49,8 @@ async function playLevel(level) {
   let data;
   try {
     data = await ui.api('/api/bot_game', {
-      method: 'POST', body: { level, seat: 'random', nickname: ui.nickname() },
+      method: 'POST',
+      body: { level, seat: 'random', nickname: ui.nickname(), time_control: ui.timeControl() },
     });
   } catch (e) {
     return;
@@ -61,6 +62,7 @@ async function playLevel(level) {
 async function init() {
   const grid = document.getElementById('bots-grid');
   if (!grid) return;
+  ui.mountTimeControlPicker(document.getElementById('bots-time-control'));
   let levels = [1, 2, 3, 4, 5, 6];
   try {
     const bots = await ui.api('/api/house_bots');

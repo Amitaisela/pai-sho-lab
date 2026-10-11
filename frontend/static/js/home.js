@@ -28,6 +28,55 @@ function setupBody() {
   return currentSetup ? { setup: currentSetup } : {};
 }
 
+// ------------------------------------------------------------ rated / casual
+//
+// Rated games need a signed-in user with a username and a time control, so the toggle is only
+// shown then; with it hidden the choice is Casual whatever was stored.
+
+const RATED_KEY = 'pai_rated';
+
+function storedRated() {
+  try { return localStorage.getItem(RATED_KEY) === 'rated'; } catch (e) { return false; }
+}
+
+function ratedAllowed() {
+  const acct = ui.getAccountState();
+  return acct.signedIn && !!acct.username && ui.timeControl() !== 'untimed';
+}
+
+function ratedChoice() {
+  return ratedAllowed() && storedRated();
+}
+
+function syncRatedToggle() {
+  const el = document.getElementById('rated-toggle');
+  if (!el) return;
+  el.hidden = !ratedAllowed();
+  const rated = ratedChoice();
+  el.querySelectorAll('[data-rated]').forEach((b) => {
+    const on = (b.dataset.rated === 'rated') === rated;
+    b.classList.toggle('is-selected', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
+function wireRatedToggle() {
+  const el = document.getElementById('rated-toggle');
+  if (!el) return;
+  el.querySelectorAll('[data-rated]').forEach((b) => {
+    b.addEventListener('click', () => {
+      try { localStorage.setItem(RATED_KEY, b.dataset.rated); } catch (e) { /* private mode */ }
+      syncRatedToggle();
+    });
+  });
+  // The time-control chips save their own choice first (their handler is on the chip itself).
+  document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('[data-time-control]')) syncRatedToggle();
+  });
+  ui.accountReady().then(syncRatedToggle);
+  syncRatedToggle();
+}
+
 // --------------------------------------------------------------- quick match
 
 function stopQmPoll() {
@@ -51,7 +100,7 @@ function cancelSeekBeacon(sid) {
   if (!sid) return;
   try {
     fetch(`/api/seek/${sid}?client_id=${encodeURIComponent(ui.clientId())}`,
-      { method: 'DELETE', keepalive: true }).catch(() => {});
+      { method: 'DELETE', keepalive: true, headers: ui.csrfHeaders() }).catch(() => {});
   } catch (e) { /* best effort */ }
 }
 
@@ -59,17 +108,26 @@ window.addEventListener('pagehide', () => {
   cancelSeekBeacon(qmSeekId);
 });
 
-async function startQuickMatch(seekId) {
+async function startQuickMatch(seekId, seekTimeControl, seekRated) {
   let data;
   try {
     data = await ui.api('/api/seek', {
       method: 'POST',
       body: {
         nickname: ui.nickname(), client_id: ui.clientId(),
+        // Taking a listed seek means taking the time control and rated-ness that seek asked for.
+        time_control: seekId && seekTimeControl ? seekTimeControl : ui.timeControl(),
+        rated: seekId ? !!seekRated : ratedChoice(),
         ...(seekId ? { seek_id: seekId } : {}), ...setupBody(),
       },
     });
   } catch (e) {
+    if (seekId && e && e.status === 401) {
+      // A guest tapped a rated seek in the list: say why nothing happened.
+      ui.sheet('<h2>Sign in to join rated games</h2><p class="muted">Rated games are for signed-in players with a username.</p>');
+    } else if (seekId && e && e.status === 403 && e.error) {
+      ui.sheet(`<h2>${escapeHtml(e.error)}</h2>`);
+    }
     return;
   }
   if (data.game_id) {
@@ -151,13 +209,18 @@ function renderSeeks(rows) {
   }
   el.hidden = false;
   el.innerHTML = rows.map((r) => `
-    <li><button type="button" class="qm-seek-item" data-seek-id="${escapeHtml(r.seek_id)}">
-      ${escapeHtml(r.nickname)} is waiting &mdash; tap to play
+    <li><button type="button" class="qm-seek-item" data-seek-id="${escapeHtml(r.seek_id)}"
+      data-time-control-of-seek="${escapeHtml(r.time_control || 'untimed')}"
+      data-rated-seek="${r.rated ? 'true' : 'false'}">
+      ${escapeHtml(r.nickname)}${r.rating != null ? ` (${escapeHtml(r.rating)})` : ''} is waiting &mdash; tap to play
+      <span class="muted">${escapeHtml(r.time_control || 'untimed')}</span>
+      ${r.rated ? '<span class="rated-tag">Rated</span>' : ''}
       <span class="muted qm-seek-age" data-seek-id="${escapeHtml(r.seek_id)}">${seekAgeText(r.seek_id)}</span>
     </button></li>
   `).join('');
   el.querySelectorAll('.qm-seek-item').forEach((btn) => {
-    btn.addEventListener('click', () => startQuickMatch(btn.dataset.seekId));
+    btn.addEventListener('click', () => startQuickMatch(
+      btn.dataset.seekId, btn.dataset.timeControlOfSeek, btn.dataset.ratedSeek === 'true'));
   });
 }
 
@@ -177,9 +240,14 @@ function qrSvgFor(url) {
 
 async function startChallenge() {
   let data;
+  const wantRated = ratedChoice();
   try {
     data = await ui.api('/api/challenge', {
-      method: 'POST', body: { nickname: ui.nickname(), seat: 'random', ...setupBody() },
+      method: 'POST',
+      body: {
+        nickname: ui.nickname(), seat: 'random', time_control: ui.timeControl(),
+        rated: wantRated, ...setupBody(),
+      },
     });
   } catch (e) {
     return;
@@ -188,6 +256,7 @@ async function startChallenge() {
   const url = new URL(data.join_url, location.origin).href;
   const close = ui.sheet(`
     <h2>Challenge created</h2>
+    ${wantRated ?'<p class="muted">Rated game: both players need an account.</p>' : ''}
     <p class="muted">Send this link, or share the QR code.</p>
     <label class="game__field">Join link
       <input id="challenge-link-input" readonly value="${escapeHtml(url)}" onclick="this.select()">
@@ -270,7 +339,8 @@ async function playBot() {
   let data;
   try {
     data = await ui.api('/api/bot_game', {
-      method: 'POST', body: { level: selectedLevel, seat: 'random', nickname: ui.nickname() },
+      method: 'POST',
+      body: { level: selectedLevel, seat: 'random', nickname: ui.nickname(), time_control: ui.timeControl() },
     });
   } catch (e) {
     return;
@@ -377,6 +447,8 @@ function wire() {
   document.getElementById('custom-game-link').addEventListener('click', openCustomGameSheet);
   document.getElementById('bot-play-btn').addEventListener('click', playBot);
 
+  document.querySelectorAll('[data-time-control-mount]').forEach((el) => ui.mountTimeControlPicker(el));
+  wireRatedToggle();
   loadHouseBots();
   refreshSeeksList();
   refreshLive();

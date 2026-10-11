@@ -79,6 +79,67 @@ export function setSeatToken(gid, seat, token) {
   writeLS(`pai_seat_${gid}`, JSON.stringify({ seat, token }));
 }
 
+// ---------------------------------------------------------- time control
+
+const TIME_CONTROL_KEY = 'pai_time_control';
+const TIME_CONTROLS = ['untimed', '3+2', '5+3', '10+5', '15+10'];
+
+/** The saved time-control choice (a preset key), 'untimed' by default. Anything stored that
+ * is not one of the five presets reads as untimed. */
+export function timeControl() {
+  const v = readLS(TIME_CONTROL_KEY);
+  return TIME_CONTROLS.includes(v) ? v : 'untimed';
+}
+
+export function isTimeControl(key) {
+  return TIME_CONTROLS.includes(key);
+}
+
+export function setTimeControl(key) {
+  if (TIME_CONTROLS.includes(key)) writeLS(TIME_CONTROL_KEY, key);
+  return timeControl();
+}
+
+/** A chip row with the five options; the saved choice is pre-selected. Pair with
+ * mountTimeControlPicker(), which also wires the clicks. */
+export function timeControlPickerHtml() {
+  const current = timeControl();
+  const chips = TIME_CONTROLS.map((k) => `
+    <button type="button" class="chip${k === current ? ' is-selected' : ''}"
+      data-time-control="${k}" aria-pressed="${k === current}">${k === 'untimed' ? 'Untimed' : k}</button>
+  `).join('');
+  return `<div class="chip-row" role="group" aria-label="Time control">${chips}</div>`;
+}
+
+/** Fills `el` with the picker and keeps every mounted picker on the page showing the saved choice. */
+export function mountTimeControlPicker(el) {
+  if (!el) return;
+  el.innerHTML = timeControlPickerHtml();
+  el.querySelectorAll('[data-time-control]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const chosen = setTimeControl(chip.dataset.timeControl);
+      document.querySelectorAll('[data-time-control]').forEach((c) => {
+        const on = c.dataset.timeControl === chosen;
+        c.classList.toggle('is-selected', on);
+        c.setAttribute('aria-pressed', String(on));
+      });
+    });
+  });
+}
+
+/** Milliseconds as a clock face: 'm:ss', or 'm:ss.t' (tenths) below ten seconds. */
+export function formatClock(ms) {
+  const left = Math.max(0, Number(ms) || 0);
+  if (left < 10000) {
+    const tenths = Math.floor(left / 100);
+    return `0:0${Math.floor(tenths / 10)}.${tenths % 10}`;
+  }
+  const total = Math.ceil(left / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 const LAB_TOKEN_KEY = 'mushibot_api_token';
 
 /** Full result of `/api/lab/check`: `ok` (this browser is in), and
@@ -108,8 +169,43 @@ export function setLabToken(token) {
   writeLS(LAB_TOKEN_KEY, String(token || '').trim());
 }
 
+// Pages that have accounts load account_chrome.js, which registers these hooks so every
+// mutating api() call waits for the signed-in state and carries its CSRF header. Pages
+// without accounts (the Lab) never set them and behave exactly as before.
+const accountHooks = {
+  ready: Promise.resolve(), csrf: () => ({}), state: () => ({ user: null }),
+};
+
+export function setAccountHooks(h) {
+  if (h && h.ready) accountHooks.ready = h.ready;
+  if (h && h.csrf) accountHooks.csrf = h.csrf;
+  if (h && h.state) accountHooks.state = h.state;
+}
+
+/** Resolves once the signed-in state is known (immediately on pages without accounts). */
+export function accountReady() {
+  return accountHooks.ready;
+}
+
+/** {signedIn, username} as of now: signed out until the account hooks say otherwise. */
+export function getAccountState() {
+  let s = null;
+  try { s = accountHooks.state(); } catch { s = null; }
+  const user = s && s.user ? s.user : null;
+  return { signedIn: !!user, username: user && user.username ? user.username : null };
+}
+
+/** Headers a cookie-authenticated mutation must carry (empty for signed-out visitors). */
+export function csrfHeaders() {
+  return accountHooks.csrf();
+}
+
 export async function api(path, { method = 'GET', body } = {}) {
   const opts = { method, headers: {} };
+  if (method !== 'GET') {
+    await accountHooks.ready;
+    Object.assign(opts.headers, accountHooks.csrf());
+  }
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -200,6 +296,7 @@ function menuHtml() {
       <a href="/bots">Bots</a>
       <a href="/developers">Developers</a>
       <a id="menu-lab-link" href="/lab" hidden>Lab</a>
+      <button type="button" id="menu-signout-btn" hidden>Sign out</button>
       <div class="menu-sep"></div>
       <button type="button" id="menu-theme-btn"></button>
     </div>
@@ -250,4 +347,12 @@ export function initChrome() {
     labAllowedCache = ok;
     if (ok && labLink) labLink.hidden = false;
   });
+
+  if (document.body.hasAttribute('data-accounts')) {
+    // Set synchronously, before the module has loaded: any mutating api() call made on page load
+    // waits for the module AND its signed-in state, so it cannot leave without the CSRF header.
+    const loaded = import('/static/js/account_chrome.js');
+    accountHooks.ready = loaded.then((m) => m.ready).catch(() => { /* signed out: never hang */ });
+    loaded.then((m) => m.init()).catch(() => { /* signed-out chrome */ });
+  }
 }

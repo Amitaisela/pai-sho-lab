@@ -5,9 +5,14 @@ services:
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
+      # Kernel networking (not userspace): a peer reaching :5000 directly keeps its own tailnet
+      # IP, so it cannot spoof X-Forwarded-For (userspace mode shows it as 127.0.0.1).
+      - TS_USERSPACE=false
     volumes:
       - tailscale-state:/var/lib/tailscale
     cap_add: [NET_ADMIN, NET_RAW]
+    devices:
+      - /dev/net/tun:/dev/net/tun
     ports:
       # Host-local only; tailnet peers reach mushibot:5001 (the Lab) through this sidecar.
       - "127.0.0.1:5001:5001"

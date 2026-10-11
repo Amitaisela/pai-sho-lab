@@ -3,6 +3,11 @@
 {% block content %}
   <div id="game-root" class="game" data-gid="{{ gid }}">
     <div id="game-badge" class="game__badge" hidden>Watching</div>
+    <div id="game-clock-stash" hidden>
+      <span class="strip__clock" data-clock="1"></span>
+      <span class="strip__clock" data-clock="2"></span>
+    </div>
+    <div id="game-rated" class="game__rated" hidden></div>
     <div id="game-top-strip" class="strip"></div>
     <div id="game-board"></div>
     <div id="game-bottom-strip" class="strip"></div>

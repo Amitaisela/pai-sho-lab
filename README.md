@@ -38,7 +38,7 @@ Everything else happens in the browser.
 - **Clash:** opposites (R3/W3, R4/W4, R5/W5). A move may never line them up, even if uncovering one. You capture an enemy basic flower that clashes with yours by landing on it; captured tiles leave the game for good.
 - **Bonus:** an Arrange that creates a new harmony earns one optional bonus — place an accent tile (Rock, Wheel, Knotweed, Boat), plant a special flower (White Lotus, Orchid), or (if none of yours are growing) plant a basic flower — or skip it.
 
-Full rules are on the Lab's rules page. Developers who use Claude Code also get a rules and engine reference skill at [.claude/skills/skud-pai-sho/](.claude/skills/skud-pai-sho/SKILL.md). The engine now matches the official rulebook closely; the skill lists the few remaining intentional differences.
+Full rules are on the Lab's rules page. The engine now matches the official rulebook closely.
 
 ## I want to play
 

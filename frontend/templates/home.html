@@ -4,6 +4,15 @@
   <div class="home-grid">
     <section id="home-play-block" class="home-play" aria-labelledby="home-play-heading">
       <h1 id="home-play-heading">Play a person</h1>
+      <div class="time-control">
+        <span class="muted time-control__label">Time control</span>
+        <div data-time-control-mount></div>
+        <div id="rated-toggle" class="chip-row rated-toggle" role="group" aria-label="Rated or casual" hidden>
+          <button type="button" class="chip" data-rated="casual" aria-pressed="true">Casual</button>
+          <button type="button" class="chip" data-rated="rated" aria-pressed="false">Rated</button>
+        </div>
+        <p class="muted time-control__note">Pass and play is never timed.</p>
+      </div>
       <div class="tile-grid">
         <button type="button" class="tile tile--primary" id="quick-match-tile">
           <img class="tile-icon" src="/static/tiles/GL.png" alt="" width="36" height="36">
@@ -39,6 +48,10 @@
     <div id="home-side-block" class="home-side">
       <section class="home-bots" aria-labelledby="home-bots-heading">
         <h2 id="home-bots-heading">Play MushiBot</h2>
+        <div class="time-control">
+          <span class="muted time-control__label">Time control</span>
+          <div data-time-control-mount></div>
+        </div>
         <div class="home-bots__row">
           <div id="bot-level-row" class="chip-row"></div>
           <button type="button" class="btn btn-primary" id="bot-play-btn">Play</button>

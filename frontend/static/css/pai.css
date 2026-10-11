@@ -359,6 +359,32 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 4px; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+/* Clocks: display only (the server decides). Tabular figures so the digits don't jitter. */
+.strip__clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 1.125rem;
+  padding: 2px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.strip__clock.clock--running { color: var(--text); }
+
+.strip__clock.clock--warn { color: color-mix(in srgb, var(--danger) 55%, var(--text)); }
+
+.strip__clock.clock--low {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+}
+
+.time-control { margin: 0 0 var(--gap); }
+
+.time-control__label { display: block; font-size: var(--fs-label); margin-bottom: 4px; }
+
+.time-control__note { margin: 6px 0 0; font-size: var(--fs-label); }
+
 /* ------------------------------------------------------------------- menu */
 
 .menu-list {
@@ -1156,3 +1182,25 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 4px; }
 .lab-gate h2 { font-size: 1.15rem; }
 .lab-gate .game__field { text-align: left; margin: 16px 0 10px; }
 .lab-gate .btn { width: 100%; }
+
+/* ------------------------------------------------------------------ ratings */
+
+.rated-toggle { margin-top: 6px; }
+
+.rated-tag, .rated-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-2));
+}
+
+.game__rated { display: flex; align-items: center; gap: 8px; font-size: var(--fs-label); }
+
+.rated-detail { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.strip__rating { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.rated-toggle[hidden], .game__rated[hidden] { display: none; }

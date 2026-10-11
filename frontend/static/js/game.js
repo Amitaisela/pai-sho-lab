@@ -28,6 +28,10 @@ let pollTimer = null;
 let wsLive = false;      // true once this game's state has arrived over the socket
 let lastPly = -1;       // history length of the newest state shown; older pushes are ignored
 let hintResetTimer = null;
+let clockState = null;     // state.clock as last received: {time_control, remaining_ms, running}, or null
+let clockReceivedAt = 0;   // performance.now() when clockState arrived
+let clockTimer = null;
+let flagFetchAt = 0;       // performance.now() of the last "my display hit zero" re-fetch
 
 function clearSelection() {
   selection = null;
@@ -190,6 +194,7 @@ function applyFreshState(newState) {
   state = newState;
   lastPly = (state.history || []).length;   // undo/redo may legitimately lower this
   over = state.winner !== null && state.winner !== undefined;
+  noteClock();
   publishDebugHook();
 }
 
@@ -204,6 +209,7 @@ function publishDebugHook() {
 
 function renderAll() {
   renderBadge();
+  renderRated();
   renderStrips();
   renderHint();
   renderActions();
@@ -249,6 +255,7 @@ function sizeBoard() {
   const chromeEls = [
     document.querySelector('.topbar'),
     document.getElementById('game-badge'),
+    document.getElementById('game-rated'),
     document.getElementById('game-top-strip'),
     document.getElementById('game-bottom-strip'),
     document.getElementById('game-hint'),
@@ -287,12 +294,154 @@ function seatLabel(p) {
   return seat.name || 'Open seat';
 }
 
+// ------------------------------------------------------------------ ratings
+//
+// Display only: everything comes from state.rated, which the server computes. It is null for an
+// unrated game; `players` appears once both seats are filled; `result` once the game was rated;
+// `unrated_reason` when a rated game turned out not to count.
+
+function ratedBlock() {
+  return state && state.rated ? state.rated : null;
+}
+
+function ratedPlayer(p) {
+  const block = ratedBlock();
+  return block && block.players ? block.players[String(p)] || null : null;
+}
+
+function ratingText(info) {
+  return `${info.rating}${info.provisional ? '?' : ''}`;
+}
+
+function signed(n) {
+  const v = Math.round(Number(n) || 0);
+  return v > 0 ? `+${v}` : String(v);
+}
+
+function changeText(change) {
+  if (!change) return '';
+  return `${change.before} → ${change.after} (${signed(change.after - change.before)})`;
+}
+
+// The line under the badge: what a win or a loss is worth before the first move, the rating
+// change afterwards, or why the game does not count.
+function ratedDetailText() {
+  const block = ratedBlock();
+  if (!block) return '';
+  if (block.unrated_reason) return `Unrated: ${block.unrated_reason}`;
+  const result = block.result;
+  if (over && result && result.changes) {
+    const mine = ctx.mySeat !== null ? result.changes[String(ctx.mySeat)] : null;
+    if (mine) return changeText(mine);
+    return [1, 2].filter((p) => result.changes[String(p)]).map((p) => {
+      const info = ratedPlayer(p);
+      return `${info ? info.username : seatLabel(p)} ${changeText(result.changes[String(p)])}`;
+    }).join(' · ');
+  }
+  if (over) return '';
+  const hist = state.history || [];
+  const mineInfo = ctx.mySeat !== null ? ratedPlayer(ctx.mySeat) : null;
+  if (hist.length === 0 && mineInfo) return `${signed(mineInfo.win)} / ${signed(mineInfo.loss)}`;
+  return '';
+}
+
+function renderRated() {
+  const el = document.getElementById('game-rated');
+  if (!el) return;
+  const block = ratedBlock();
+  if (!block) {
+    el.hidden = true;
+    el.innerHTML = '';
+    return;
+  }
+  el.hidden = false;
+  const detail = ratedDetailText();
+  el.innerHTML = `<span class="rated-badge">Rated${block.category ? ` · ${escapeHtml(block.category)}` : ''}</span>`
+    + `${detail ? ` <span class="rated-detail" id="rated-detail">${escapeHtml(detail)}</span>` : ''}`;
+  // A result sheet that opened before the rating arrived picks the change up here.
+  const line = document.getElementById('result-rating');
+  if (line) line.textContent = detail;
+}
+
 function fillStrip(el, p) {
   if (!el) return;
+  // The clock spans live in a hidden stash until a strip claims them; park them there before
+  // the strip's markup is rebuilt, so rebuilding it never destroys them.
+  const stash = document.getElementById('game-clock-stash');
+  if (stash) el.querySelectorAll('[data-clock]').forEach((n) => stash.appendChild(n));
   const isTurn = !over && state.current_player === p;
   el.classList.toggle('is-turn', isTurn);
   const you = ctx.mySeat === p ? ' <span class="muted">(you)</span>' : '';
-  el.innerHTML = `<div class="strip__name"><span class="strip__turn-dot"></span>${escapeHtml(seatLabel(p))}${you}</div>`;
+  const info = ratedPlayer(p);
+  const rating = info ? ` <span class="strip__rating" data-rating-seat="${p}">${escapeHtml(ratingText(info))}</span>` : '';
+  el.innerHTML = `<div class="strip__name"><span class="strip__turn-dot"></span>${escapeHtml(seatLabel(p))}${rating}${you}</div>`;
+  const clockEl = document.querySelector(`[data-clock="${p}"]`);
+  if (clockEl) el.appendChild(clockEl);
+  renderClocks();
+}
+
+// ------------------------------------------------------------------- clocks
+//
+// Display only. The server's numbers arrive with every state (HTTP or socket) and are
+// re-applied each time; between arrivals the running side's clock is extrapolated from
+// performance.now(), so a wrong or tampered browser clock never decides anything. When
+// the local count hits zero the page re-fetches the game rather than deciding a result.
+
+function noteClock() {
+  clockState = state && state.clock ? state.clock : null;
+  clockReceivedAt = performance.now();
+  if (clockState && !over) {
+    if (!clockTimer) clockTimer = setInterval(tickClocks, 100);
+  } else if (clockTimer) {
+    clearInterval(clockTimer);
+    clockTimer = null;
+  }
+  renderClocks();
+}
+
+function clockLeft(seat) {
+  const base = Number(clockState.remaining_ms[String(seat)]) || 0;
+  const elapsed = !over && clockState.running === seat ? performance.now() - clockReceivedAt : 0;
+  return Math.max(0, base - elapsed);
+}
+
+function renderClocks() {
+  document.querySelectorAll('[data-clock]').forEach((el) => {
+    if (!clockState) {
+      el.hidden = true;
+      return;
+    }
+    const seat = Number(el.dataset.clock);
+    const left = clockLeft(seat);
+    const running = !over && clockState.running === seat;
+    el.hidden = false;
+    el.textContent = running && left <= 0 ? 'Time…' : ui.formatClock(left);
+    el.classList.toggle('clock--running', running);
+    el.classList.toggle('clock--low', left < 10000);
+    el.classList.toggle('clock--warn', left >= 10000 && left < 30000);
+  });
+}
+
+function tickClocks() {
+  if (!clockState || over) {
+    noteClock();
+    return;
+  }
+  renderClocks();
+  const runner = clockState.running;
+  if (runner && clockLeft(runner) <= 0 && performance.now() - flagFetchAt > 1500) {
+    flagFetchAt = performance.now();
+    refetchGame();
+  }
+}
+
+// One fetch that lets the server settle (and push) the result; nothing is decided here.
+async function refetchGame() {
+  try {
+    onGameData(await ui.api(gamePollUrl()));
+  } catch (e) {
+    if (e && e.status === 404) showExpired();
+  }
 }
 
 function renderStrips() {
@@ -370,7 +519,7 @@ function renderActions() {
   if (canResignNow()) {
     el.appendChild(actionButton('resign-btn', 'Resign', 'btn-quiet', confirmResign));
   }
-  if (mode !== 'human' && (state.history || []).length > 0) {
+  if (mode !== 'human' && !state.clock && (state.history || []).length > 0) {
     el.appendChild(actionButton('undo-btn', 'Undo', 'btn-quiet', doUndo));
     if (canRedo) el.appendChild(actionButton('redo-btn', 'Redo', 'btn-quiet', doRedo));
   }
@@ -532,10 +681,14 @@ const END_REASON_TEXT = {
   last_basic_flower: 'Last basic flower — midline harmonies decide',
   no_moves: 'No legal moves',
   resign: 'Resignation',
+  timeout: 'Time out',
 };
 
 function resultDetail() {
   if (state.winner === 0) return 'Tie';
+  if (state.end_reason === 'timeout' && (state.winner === 1 || state.winner === 2)) {
+    return `${seatLabel(3 - state.winner)} ran out of time`;
+  }
   return END_REASON_TEXT[state.end_reason] || state.message || 'Game over';
 }
 
@@ -548,6 +701,16 @@ function resultHeadline() {
   return resultDetail();
 }
 
+// The finished game's own time control as a preset key, so a rematch plays like the game just
+// played. An untimed game rematches untimed; a non-preset (test-only) control falls back to the
+// saved choice.
+function rematchTimeControl() {
+  if (!state.clock) return 'untimed';
+  const tc = state.clock.time_control;
+  const key = tc ? `${tc.base_s / 60}+${tc.inc_s}` : '';
+  return ui.isTimeControl(key) ? key : ui.timeControl();
+}
+
 async function doRematch() {
   try {
     if (mode === 'bot') {
@@ -555,12 +718,19 @@ async function doRematch() {
       const botSeat = seats[3 - mySeatNow];
       const level = botSeat ? botSeat.level : 1;
       const r = await ui.api('/api/bot_game', {
-        method: 'POST', body: { level, seat: 3 - mySeatNow, nickname: ui.nickname() },
+        method: 'POST', body: { level, seat: 3 - mySeatNow, nickname: ui.nickname(), time_control: rematchTimeControl() },
       });
       ui.setSeatToken(r.game_id, r.seat, r.seat_token);
       location.href = `/game/${r.game_id}`;
     } else if (mode === 'human') {
-      const r = await ui.api('/api/challenge', { method: 'POST', body: { nickname: ui.nickname(), seat: 'random' } });
+      // Rated again only if this game was and I am still signed in with a username; the opponent
+      // must be too, or the server refuses their join.
+      const acct = ui.getAccountState();
+      const rated = !!state.rated && acct.signedIn && !!acct.username && !!state.clock;
+      const r = await ui.api('/api/challenge', {
+        method: 'POST',
+        body: { nickname: ui.nickname(), seat: 'random', time_control: rematchTimeControl(), rated },
+      });
       ui.setSeatToken(r.game_id, r.seat, r.seat_token);
       showShareSheet(r.join_url);
     } else {
@@ -589,6 +759,7 @@ function maybeShowResultSheet() {
   const close = ui.sheet(`
     <h2 id="result-title">${escapeHtml(resultHeadline())}</h2>
     <p class="muted">${escapeHtml(resultDetail())}</p>
+    <p class="rated-detail" id="result-rating">${escapeHtml(ratedDetailText())}</p>
     <div class="game__sheet-actions">
       <button type="button" class="btn btn-primary" id="rematch-btn">Rematch</button>
       <a class="btn btn-secondary" href="/">New opponent</a>
@@ -621,6 +792,7 @@ function onGameData(data) {
   mode = data.mode;
   seats = data.seats;
   over = data.over;
+  noteClock();
   ctx = computeSeatContext();
   publishDebugHook();
   renderAll();
@@ -685,7 +857,13 @@ async function pollOnce() {
       renderStrips();
       renderBadge();
       maybeOfferJoin();
-      if (prevOpen && !hasOpenSeat()) ensureSubscribed();   // someone joined: refresh snapshot
+      if (prevOpen && !hasOpenSeat()) {
+        // Someone joined. Joining starts a challenge's clock but is not pushed over the
+        // socket, so take this response as the authoritative snapshot (it carries the clock).
+        ensureSubscribed();   // refresh the socket snapshot too
+        onGameData(data);
+        return;
+      }
       syncPolling();
       return;
     }
@@ -716,7 +894,8 @@ function sameShown(a, b) {
     && a.bonus_turn === b.bonus_turn && a.end_reason === b.end_reason
     && (a.history || []).length === (b.history || []).length && a.message === b.message
     && JSON.stringify(a.board) === JSON.stringify(b.board)
-    && JSON.stringify(a.hands) === JSON.stringify(b.hands);
+    && JSON.stringify(a.hands) === JSON.stringify(b.hands)
+    && JSON.stringify(a.rated) === JSON.stringify(b.rated);
 }
 
 function onSocketState(msg) {
@@ -730,6 +909,7 @@ function onSocketState(msg) {
     const moved = (state.history || []).length !== (msg.state.history || []).length;
     state = msg.state;
     over = !!msg.over || (state.winner !== null && state.winner !== undefined);
+    noteClock();
     ctx = computeSeatContext();
     if (moved) clearSelection();
     publishDebugHook();
@@ -737,6 +917,9 @@ function onSocketState(msg) {
     maybeShowResultSheet();
     // No maybeBotMove() here: over the socket the server owns the bot reply, and a push
     // lands between the human move and the bot's, so asking for a bot move now would race it.
+  } else if (JSON.stringify(state.clock) !== JSON.stringify(msg.state.clock)) {
+    state.clock = msg.state.clock;      // same position, new clock reading (e.g. the clock started)
+    noteClock();
   }
   syncPolling();
 }

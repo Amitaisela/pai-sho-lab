@@ -2,7 +2,6 @@ tests/test_report.txt
 logs/
 data/checkpoints
 engine/RustEngine/target/
-docs/
 data/elo/
 /elo_*.json
 future.txt
@@ -13,7 +12,6 @@ future.txt
 thoughts.txt
 .claude/*
 !.claude/skills/
-CLAUDE.md
 .idea/
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -223,3 +221,7 @@ __marimo__/
 
 # Official rulebook PDF (third-party; not redistributed)
 SkudPaiShoRules_*.pdf
+
+# Owner-only: Claude Code subagent workspace and personal notes
+.superpowers/
+CLAUDE.local.md
