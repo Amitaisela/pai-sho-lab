@@ -442,16 +442,20 @@ async function refreshLive() {
   renderLive(rows);
 }
 
-// A mini board for the lobby: the circle, the diamond, and one dot per tile, blue for the Guest
-// and orange for the Host (a dashed ring while growing). `board` is {"row,col": [player, growing]}.
+// A mini board for the lobby: the circle, the two red and two white garden triangles in their real
+// quadrants, the four gates, and one dot per tile, blue for the Guest and orange for the Host (a
+// dashed ring while growing). `board` is {"row,col": [player, growing]}.
 function miniBoardSvg(board) {
   const dots = Object.entries(board || {}).map(([k, v]) => {
     const [r, c] = k.split(',').map(Number);
-    return `<circle cx="${c + 0.5}" cy="${r + 0.5}" r="0.46" class="mini-p${v[0]}${v[1] ? ' mini-growing' : ''}"/>`;
+    return `<circle cx="${c + 0.5}" cy="${r + 0.5}" r="0.7" class="mini-p${v[0]}${v[1] ? ' mini-growing' : ''}"/>`;
   }).join('');
   return '<svg class="mini-board" viewBox="0 0 19 19" aria-hidden="true">'
     + '<circle cx="9.5" cy="9.5" r="9.4" class="mini-bg"/>'
-    + '<path d="M9.5 2.5 L16.5 9.5 L9.5 16.5 L2.5 9.5 Z" class="mini-diamond"/>'
+    + '<path d="M9.5 9.5 L9.5 2.5 L16.5 9.5 Z M9.5 9.5 L9.5 16.5 L2.5 9.5 Z" class="mini-red"/>'
+    + '<path d="M9.5 9.5 L9.5 2.5 L2.5 9.5 Z M9.5 9.5 L9.5 16.5 L16.5 9.5 Z" class="mini-white"/>'
+    + '<path d="M9.5 0.2 L11.2 1.9 L7.8 1.9 Z M9.5 18.8 L11.2 17.1 L7.8 17.1 Z '
+    + 'M0.2 9.5 L1.9 7.8 L1.9 11.2 Z M18.8 9.5 L17.1 7.8 L17.1 11.2 Z" class="mini-gate"/>'
     + `${dots}</svg>`;
 }
 
@@ -465,8 +469,11 @@ function renderLive(rows) {
   el.innerHTML = rows.map((r) => `
     <a class="live-card" href="/game/${escapeHtml(r.game_id)}">
       ${miniBoardSvg(r.board)}
-      <span class="live-card__names">${escapeHtml(r.names[0] || 'Player 1')} <span class="muted">vs</span> ${escapeHtml(r.names[1] || 'Player 2')}</span>
-      <span class="muted live-card__moves">${r.moves} moves</span>
+      <span class="live-card__names">
+        <span class="live-card__who"><i class="live-dot live-dot--p1"></i>${escapeHtml(r.names[0] || 'Player 1')}</span>
+        <span class="live-card__who"><i class="live-dot live-dot--p2"></i>${escapeHtml(r.names[1] || 'Player 2')}</span>
+      </span>
+      <span class="muted live-card__moves">${r.moves} moves &middot; watch</span>
     </a>
   `).join('');
 }
