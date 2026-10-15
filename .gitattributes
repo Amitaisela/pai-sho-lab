@@ -1,3 +1,4 @@
 ops/*.sh text eol=lf
 ops/Dockerfile* text eol=lf
 ops/*.yml text eol=lf
+ops/vps-bin/* text eol=lf

@@ -817,7 +817,7 @@ h1, h2, h3 { line-height: 1.2; margin: 0 0 4px; }
    never scroll; wide screens (and landscape phones) put everything else in a right-hand panel.
    Hands are filled by board.js into #game-hand-top / #game-hand-bottom. */
 
-body.page--game { --topbar-h: 48px; }
+body.page--game { --topbar-h: 48px; overscroll-behavior: none; }
 body.page--game .page { max-width: none; padding: 0; }
 body.page--game .topbar {
   position: static;
@@ -828,8 +828,10 @@ body.page--game .topbar {
 .game {
   --gutter: 12px;
   display: grid;
-  height: calc(100vh - var(--topbar-h));
-  height: calc(100dvh - var(--topbar-h));
+  /* Pinned to the edges of the visible window (not 100vh/100dvh, which some mobile browsers get
+     wrong while their toolbar is showing): the action bar can never be pushed below the fold. */
+  position: fixed;
+  inset: var(--topbar-h) 0 0 0;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto auto auto;
   grid-template-areas: "meta" "moves" "topstrip" "tophand" "board" "botstrip" "bothand" "hint" "actions";
@@ -949,6 +951,8 @@ body.page--game .topbar {
     --panel-w: 320px;
     --col-gap: 24px;
     --avail-h: calc(100dvh - var(--topbar-h) - 24px);
+    position: static;
+    inset: auto;
     height: var(--avail-h);
     margin: 12px auto;
     padding: 0;

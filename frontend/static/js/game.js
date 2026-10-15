@@ -1058,6 +1058,12 @@ async function maybeBotMove() {
   if (state.current_player !== botSeat) return;
   botInFlight = true;
   try {
+    // The bot's opening move: let the player see the empty board first (the server does not move
+    // until asked), then play it on the next frame so it slides in like any other move.
+    if (!(state.history || []).length) {
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      if (over || state.current_player !== botSeat) return;
+    }
     const r = await ui.api(`/api/bot_move/${gid}`, { method: 'POST', body: { seat_token: ctx.token } });
     applyFreshState(r.state);
     canRedo = false;
