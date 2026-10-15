@@ -1,22 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Game — Pai Sho Lab{% endblock %}
+{% block body_attrs %} class="page--game"{% endblock %}
 {% block content %}
+  {# The page is one grid (pai.css, ".game"): the board takes the viewport, everything else is
+     a bar or a panel beside it. The hands live outside #game-board; board.js fills them. #}
   <div id="game-root" class="game" data-gid="{{ gid }}">
-    <div id="game-badge" class="game__badge" hidden>Watching</div>
+    <div class="game__meta">
+      <div id="game-badge" class="game__badge" hidden>Watching</div>
+      <div id="game-rated" class="game__rated" hidden></div>
+    </div>
     <div id="game-clock-stash" hidden>
       <span class="strip__clock" data-clock="1"></span>
       <span class="strip__clock" data-clock="2"></span>
     </div>
-    <div id="game-rated" class="game__rated" hidden></div>
     <div id="game-top-strip" class="strip"></div>
-    <div id="game-board"></div>
+    <div id="game-hand-top" class="game__hand"></div>
+    <div id="game-board" class="game__board"></div>
+    <div id="game-conn" class="conn-pill" role="status" hidden>Reconnecting&hellip;</div>
     <div id="game-bottom-strip" class="strip"></div>
+    <div id="game-hand-bottom" class="game__hand"></div>
     <p id="game-hint" class="game__hint muted"></p>
     <div id="game-actions" class="game__actions"></div>
-    <details id="game-moves" class="game__moves">
-      <summary>Moves</summary>
+    <section id="game-moves" class="game__moves" aria-label="Moves">
+      <div class="mv-nav" id="mv-nav">
+        <button type="button" data-nav="first" aria-label="First move" title="First (Home)">&laquo;</button>
+        <button type="button" data-nav="prev" aria-label="Previous move" title="Previous (&larr;)">&lsaquo;</button>
+        <button type="button" data-nav="next" aria-label="Next move" title="Next (&rarr;)">&rsaquo;</button>
+        <button type="button" data-nav="last" aria-label="Back to the latest move" title="Latest (End)">&raquo;</button>
+        <a id="mv-download" class="mv-download" href="#" download="pai-sho-game.psn" hidden>PSN</a>
+      </div>
       <ol id="game-move-list"></ol>
-    </details>
+      <button type="button" id="mv-live" class="mv-live" hidden>Live</button>
+    </section>
   </div>
 {% endblock %}
 {% block scripts %}

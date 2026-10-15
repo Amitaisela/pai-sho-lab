@@ -7,7 +7,8 @@
  * rendered by board.js; this file only decides *what* to render.
  */
 import * as ui from '/static/js/ui.js';
-import { createBoard, formatMove } from '/static/js/board.js';
+import * as sound from '/static/js/sound.js';
+import { createBoard, psnMoveLines, psnTurns } from '/static/js/board.js';
 
 const root = document.getElementById('game-root');
 const gid = root.dataset.gid;
@@ -32,6 +33,10 @@ let clockState = null;     // state.clock as last received: {time_control, remai
 let clockReceivedAt = 0;   // performance.now() when clockState arrived
 let clockTimer = null;
 let flagFetchAt = 0;       // performance.now() of the last "my display hit zero" re-fetch
+let pending = null;        // a move sent over the socket and not yet answered: {snapshot, timer}
+let viewPly = null;        // null: the live position; else the ply being reviewed in the move list
+const positions = new Map();   // ply -> the position after it, fetched for review (cleared on undo)
+let flipOverride = false;  // the player flipped the board (the Flip button or `f`)
 
 function clearSelection() {
   selection = null;
@@ -62,7 +67,7 @@ function computeSeatContext() {
 }
 
 function isMyTurnNow() {
-  if (!state || over) return false;
+  if (!state || over || pending || viewPly !== null) return false;
   if (mode === 'pass') return true;
   return ctx.mySeat !== null && ctx.mySeat === state.current_player;
 }
@@ -74,16 +79,122 @@ function handPlayerFor() {
 }
 
 function orientation() {
-  const flip = mode === 'pass' ? state.current_player === 2 : ctx.mySeat === 2;
+  const natural = mode === 'pass' ? state.current_player === 2 : ctx.mySeat === 2;
+  const flip = natural !== flipOverride;
   return { flip, topPlayer: flip ? 1 : 2, bottomPlayer: flip ? 2 : 1 };
 }
 
 // -------------------------------------------------------------------- board
 
 const boardEl = document.getElementById('game-board');
-const board = createBoard(boardEl, { flip: false, onCellClick, onTileClick, onHandClick });
+const board = createBoard(boardEl, {
+  flip: false, onCellClick, onTileClick, onHandClick, onDragStart, onDragEnd,
+  handEls: { top: document.getElementById('game-hand-top'), bottom: document.getElementById('game-hand-bottom') },
+});
 
-async function onHandClick(player, flower) {
+// Wide windows get a drag handle on the board's bottom-right corner to make it smaller than the
+// full-height default. The factor (0.5-1 of the largest square that fits) is remembered here.
+const FIT_KEY = 'pai_board_fit';
+function readFit() {
+  try {
+    const v = parseFloat(localStorage.getItem(FIT_KEY));
+    return v >= 0.5 && v <= 1 ? v : 1;
+  } catch { return 1; }
+}
+function applyFit(v) { root.style.setProperty('--board-fit', String(v)); }
+applyFit(readFit());
+(function mountResizeHandle() {
+  const wrap = boardEl.querySelector('.pb-wrap');
+  if (!wrap) return;
+  const handle = document.createElement('div');
+  handle.id = 'board-resize';
+  handle.title = 'Drag to resize the board';
+  wrap.appendChild(handle);
+  let drag = null;
+  handle.addEventListener('pointerdown', (e) => {
+    handle.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY, fit: readFit(), cell: Math.min(boardEl.clientWidth, boardEl.clientHeight) };
+    e.preventDefault();
+  });
+  handle.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    // The board is centred, so a size change of S moves its corner by S/2 on each axis.
+    const d = ((e.clientX - drag.x) + (e.clientY - drag.y)) / 2;
+    applyFit(Math.min(1, Math.max(0.5, drag.fit + (2 * d) / drag.cell)));
+  });
+  const end = () => {
+    if (!drag) return;
+    drag = null;
+    try { localStorage.setItem(FIT_KEY, root.style.getPropertyValue('--board-fit')); } catch { /* private mode */ }
+  };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+})();
+
+// Legal moves arrive inside the state (`state.legal`, see serialize.legal_payload), so a
+// selection shows its hints in the same frame as the click: no request, no waiting.
+function legalBlock() {
+  return (state && state.legal) || { plants: {}, boats: {}, arranges: {} };
+}
+
+function handHints(flower) {
+  const legal = legalBlock();
+  if (flower === 'Boat') {
+    // a Boat targets an accent (removing both tiles) or a flower (which then moves)
+    return [...(legal.plants.Boat || []), ...Object.keys(legal.boats).map((k) => k.split(',').map(Number))];
+  }
+  return legal.plants[flower] || [];
+}
+
+function pieceHints(r, c) {
+  return legalBlock().arranges[`${r},${c}`] || [];
+}
+
+function boatDisplacement(r, c) {
+  const legal = legalBlock();
+  return {
+    direct: (legal.plants.Boat || []).some(([pr, pc]) => pr === r && pc === c),
+    moves: legal.boats[`${r},${c}`] || [],
+  };
+}
+
+// The hints for the current selection, always read from the state on screen, so a state that
+// arrives while something is selected can never leave stale targets behind.
+function currentHints() {
+  if (!selection || !state) return [];
+  if (selection.type === 'hand') return handHints(selection.flower);
+  if (selection.type === 'board') return pieceHints(selection.row, selection.col);
+  if (selection.type === 'boat_target') return boatDisplacement(selection.targetRow, selection.targetCol).moves;
+  return [];
+}
+
+// A pointer that has moved off one of my pieces or hand tiles: select it as a click would, and
+// say whether there is anywhere to drag it. The drop arrives as onCellClick (see board.js).
+function onDragStart(source) {
+  if (!isMyTurnNow()) return false;
+  if (source.type === 'hand') {
+    if (source.player !== state.current_player) return false;
+    selection = { type: 'hand', player: source.player, flower: source.flower };
+  } else {
+    const tile = state.board[`${source.row},${source.col}`];
+    if (!tile || tile.player !== state.current_player) return false;
+    selection = { type: 'board', row: source.row, col: source.col };
+  }
+  if (currentHints().length === 0) {
+    clearSelection();
+    return false;
+  }
+  sound.buzz(10);
+  renderAll();
+  return true;
+}
+
+function onDragEnd() {
+  clearSelection();
+  renderAll();
+}
+
+function onHandClick(player, flower) {
   if (!isMyTurnNow() || player !== state.current_player) return;
   if (selection && selection.type === 'hand' && selection.player === player && selection.flower === flower) {
     clearSelection();
@@ -91,14 +202,8 @@ async function onHandClick(player, flower) {
     return;
   }
   selection = { type: 'hand', player, flower };
-  hints = [];
-  renderAll();
-  try {
-    const r = await ui.api(`/api/valid_plant_moves/${gid}`, { method: 'POST', body: { tile: flower } });
-    hints = r.moves || [];
-  } catch (e) {
-    hints = [];
-  }
+  hints = handHints(flower);
+  sound.buzz(10);
   renderAll();
 }
 
@@ -118,21 +223,19 @@ async function onTileClick(r, c) {
     return;
   }
   selection = { type: 'board', row: r, col: c };
-  hints = [];
-  renderAll();
-  try {
-    const resp = await ui.api(`/api/valid_moves/${gid}`, { method: 'POST', body: { row: r, col: c } });
-    hints = resp.moves || [];
-  } catch (e) {
-    hints = [];
-  }
+  hints = pieceHints(r, c);
+  sound.buzz(10);
   renderAll();
 }
 
-async function onCellClick(r, c) {
+async function onCellClick(r, c, info = {}) {
   if (!selection || !isMyTurnNow()) return;
   const isHint = hints.some(([hr, hc]) => hr === r && hc === c);
   if (!isHint) {
+    // A finger that missed every legal point keeps the selection (the points are ~20px wide, and
+    // starting over after each miss is the worst part of playing on a phone); a mouse click on
+    // an empty point, or a drop on one, deselects.
+    if (info.pointerType === 'touch' && !info.dropped) return;
     clearSelection();
     renderAll();
     return;
@@ -148,14 +251,7 @@ async function onCellClick(r, c) {
 
   if (selection.type === 'hand') {
     if (selection.flower === 'Boat') {
-      let dr;
-      try {
-        dr = await ui.api(`/api/valid_boat_displacement/${gid}`, {
-          method: 'POST', body: { target_row: r, target_col: c },
-        });
-      } catch (e) {
-        dr = { moves: [], direct: false };
-      }
+      const dr = boatDisplacement(r, c);
       if (!dr.direct) {
         if (!dr.moves || dr.moves.length === 0) {
           flashHint('No legal Boat move there');
@@ -174,7 +270,128 @@ async function onCellClick(r, c) {
   await doMove('arrange', { from_row: selection.row, from_col: selection.col, to_row: r, to_col: c });
 }
 
+// ------------------------------------------------------- optimistic moves
+//
+// A move goes over the socket (`move`, with the ply it applies to, so a resend is harmless) and
+// is shown at once. The page predicts only what it can predict without the rules engine: an
+// Arrange, or a Plant of a flower. Accents (Wheel, Boat, ...) change other tiles, so they wait
+// for the server. The server's state push replaces the prediction; an `error` frame, or silence
+// for PENDING_MS, restores the exact state from before the click. HTTP stays as the fallback
+// whenever the socket is not open.
+
+const PENDING_MS = 4000;
+const ACCENTS = ['Rock', 'Wheel', 'Knotweed', 'Boat'];
+
+function actionFor(kind, body) {
+  if (kind === 'arrange') return ['arrange', body.from_row, body.from_col, body.to_row, body.to_col];
+  if (body.displace_row !== undefined) {
+    return ['plant', body.flower, body.row, body.col, body.displace_row, body.displace_col];
+  }
+  return ['plant', body.flower, body.row, body.col];
+}
+
+/** A copy of `s` with `action` applied as far as it can be known on the page, or null. */
+function predictMove(s, action) {
+  const p = s.current_player;
+  const board = { ...s.board };
+  let hands = s.hands;
+  if (action[0] === 'arrange') {
+    const [, fr, fc, tr, tc] = action;
+    const tile = board[`${fr},${fc}`];
+    if (!tile) return null;
+    delete board[`${fr},${fc}`];
+    board[`${tr},${tc}`] = { ...tile, growing: false };      // a capture is simply overwritten
+  } else if (action[0] === 'plant' && action.length === 4 && !ACCENTS.includes(action[1])) {
+    const [, flower, r, c] = action;
+    board[`${r},${c}`] = { flower, player: p, growing: true };
+    hands = { ...s.hands, [p]: { ...s.hands[p], [flower]: ((s.hands[p] || {})[flower] || 0) - 1 } };
+  } else {
+    return null;
+  }
+  // Harmony lines that touch a point the move changed are no longer true: drop them until the
+  // server's state (with the real harmonies) arrives.
+  const touched = new Set(action[0] === 'arrange'
+    ? [`${action[1]},${action[2]}`, `${action[3]},${action[4]}`] : [`${action[2]},${action[3]}`]);
+  const harmonies = {};
+  for (const k of ['1', '2']) {
+    harmonies[k] = ((s.harmonies || {})[k] || []).filter(
+      ([a, b]) => !touched.has(`${a[0]},${a[1]}`) && !touched.has(`${b[0]},${b[1]}`));
+  }
+  return {
+    ...s, board, hands, harmonies,
+    history: [...(s.history || []), action],
+    history_players: [...(s.history_players || []), p],
+  };
+}
+
+// ------------------------------------------------------ sound and haptics
+//
+// One sound per move, whoever made it: a thud for a capture, a tick otherwise. `feedbackPly` is
+// the history length already sounded, so the optimistic prediction and the server's push for the
+// same move make one sound, a first load is silent, and an undo or rollback just resets it.
+
+let feedbackPly = -1;
+const lowTimeSounded = { 1: false, 2: false };      // per seat: one warning when a clock drops under 10 s
+
+function giveMoveFeedback(prev, next) {
+  const n = (next.history || []).length;
+  if (feedbackPly === -1 || n < feedbackPly) { feedbackPly = n; return; }
+  if (n === feedbackPly) return;
+  feedbackPly = n;
+  const last = next.history[n - 1];
+  const target = Array.isArray(last) && last[0] === 'arrange' ? `${last[3]},${last[4]}` : null;
+  const capture = !!(target && prev && prev.board && prev.board[target]);
+  sound.play(capture ? 'capture' : 'move');
+  if (ctx.mySeat !== null && next.history_players && next.history_players[n - 1] === ctx.mySeat) sound.buzz(20);
+}
+
+function clearPending() {
+  if (!pending) return false;
+  clearTimeout(pending.timer);
+  pending = null;
+  return true;
+}
+
+function rollBack(message) {
+  if (!pending) return;
+  const { snapshot } = pending;
+  clearPending();
+  state = snapshot;
+  clearSelection();
+  noteClock();
+  renderAll();
+  if (message) flashHint(message);
+}
+
+window.addEventListener('mushi:error', (ev) => {
+  if (!pending) return;
+  const e = ev.detail || {};
+  rollBack(e.message || 'that move is not allowed');
+  if (e.code === 'ply_gap' || e.code === 'not_found') refetchGame();     // we were out of sync
+});
+
+function sendOverSocket(action) {
+  if (!wsLive || !window.MushiLive || !window.MushiLive.isOpen()) return false;
+  if (mode !== 'pass' && !ctx.token) return false;
+  const snapshot = state;
+  const ok = window.MushiLive.move(gid, (state.history || []).length, action, ctx.token || undefined);
+  if (!ok) return false;
+  pending = { snapshot, timer: setTimeout(() => { if (clearPending()) refetchGame(); }, PENDING_MS) };
+  const predicted = predictMove(snapshot, action);
+  if (predicted) {
+    state = predicted;
+    giveMoveFeedback(snapshot, predicted);
+  }
+  return true;
+}
+
 async function doMove(kind, body) {
+  if (sendOverSocket(actionFor(kind, body))) {
+    canRedo = false;
+    clearSelection();
+    renderAll();
+    return;
+  }
   const path = kind === 'plant' ? `/api/plant/${gid}` : `/api/arrange/${gid}`;
   const payload = ctx.token ? { ...body, seat_token: ctx.token } : body;
   try {
@@ -191,6 +408,8 @@ async function doMove(kind, body) {
 }
 
 function applyFreshState(newState) {
+  clearPending();
+  giveMoveFeedback(state, newState);
   state = newState;
   lastPly = (state.history || []).length;   // undo/redo may legitimately lower this
   over = state.winner !== null && state.winner !== undefined;
@@ -199,15 +418,78 @@ function applyFreshState(newState) {
 }
 
 function publishDebugHook() {
-  // A read-only hook for Playwright checks — not
-  // used by the page itself. Harmless to leave in production: it just
-  // mirrors module state that's otherwise private to this closure.
-  window.__pai = { state, mode, over, ctx };
+  // A read-only hook for Playwright checks, published only with ?debug=1. It never carries
+  // the seat token: any script on the page could read it from window.
+  if (!new URLSearchParams(location.search).has('debug')) return;
+  const { token, ...safeCtx } = ctx;
+  window.__pai = { state, mode, over, wsLive, ctx: safeCtx };
 }
 
 // ------------------------------------------------------------------ render
 
+// ------------------------------------------------- connection, wake lock, visibility
+//
+// A "Reconnecting..." pill shows once the live connection has been down for a moment (no flicker
+// for a blip), or at once when the browser reports it is offline. Coming back to the tab asks for
+// a fresh snapshot, because a phone may have frozen the page and its socket meanwhile. A timed
+// game keeps the screen awake for the player: a phone dimming in the middle of a blitz game
+// costs real games.
+
+let connTimer = null;
+
+function setConnected(up) {
+  const pill = document.getElementById('game-conn');
+  if (!pill) return;
+  clearTimeout(connTimer);
+  if (up && navigator.onLine !== false) {
+    pill.hidden = true;
+  } else if (navigator.onLine === false) {
+    pill.hidden = false;
+  } else {
+    connTimer = setTimeout(() => { pill.hidden = false; }, 1200);
+  }
+}
+
+window.addEventListener('offline', () => setConnected(false));
+window.addEventListener('online', () => {
+  if (window.MushiLive) {
+    window.MushiLive.connect();
+    ensureSubscribed();
+  }
+  setConnected(!!(window.MushiLive && window.MushiLive.isOpen()));
+  refetchGame();
+});
+
+let wakeLock = null;
+
+async function syncWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  const want = !!(state && state.clock && !over && !ctx.watching && document.visibilityState === 'visible');
+  try {
+    if (want && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!want && wakeLock) {
+      const lock = wakeLock;
+      wakeLock = null;
+      await lock.release();
+    }
+  } catch (e) {
+    wakeLock = null;              // refused (low battery, no permission): the game goes on without
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !state) return;
+  syncWakeLock();
+  if (window.MushiLive && !window.MushiLive.isOpen()) window.MushiLive.connect();
+  ensureSubscribed();             // a fresh snapshot, whatever the socket did while the tab was hidden
+  if (!over) refetchGame();
+});
+
 function renderAll() {
+  if (viewPly !== null && viewPly >= (state.history || []).length) viewPly = null;   // caught up with the live game
+  hints = viewPly === null ? currentHints() : [];
   renderBadge();
   renderRated();
   renderStrips();
@@ -216,75 +498,37 @@ function renderAll() {
   renderMoves();
   const { flip } = orientation();
   board.setFlip(flip);
-  board.render(state, { selected: selection, hints, myHandPlayer: handPlayerFor() });
-  sizeBoard();
-}
-
-// The board (board.js's own CSS) is naturally responsive by width alone —
-// `width: 100%; max-width: 820px` — which is right on a tall phone screen,
-// but on a short wide one (a laptop at 1280x900, say) that width-only sizing
-// lets a tall circular board overflow the viewport, pushing the player's own
-// hand and the action row below the fold. This measures the vertical space
-// everything *around* the board actually takes (the top bar, strips, hint
-// line, action row, move list, and — below the pai.css ≥900px breakpoint,
-// where the hands still stack above/below the board instead of sitting
-// beside it — the board's own two hand rows) and constrains the board to
-// whichever is smaller: the width it would have claimed anyway, or the
-// height left over — clamped to a 320px floor and a ceiling the design
-// calls for (820px stacked, 900px side-by-side, since the hands no longer
-// take vertical space there). On a tall phone the height budget is never
-// the tighter constraint, so the board still ends up full width there.
-let sizeRaf = null;
-function scheduleSizeBoard() {
-  if (sizeRaf) return;
-  sizeRaf = requestAnimationFrame(() => {
-    sizeRaf = null;
-    sizeBoard();
+  // Reviewing an earlier move shows that position, read-only; the live state is untouched.
+  const shown = viewPly !== null && positions.get(viewPly) ? positions.get(viewPly) : state;
+  board.render(shown, {
+    selected: viewPly === null ? selection : null, hints, myHandPlayer: viewPly === null ? handPlayerFor() : null,
   });
-}
-window.addEventListener('resize', scheduleSizeBoard);
-
-const DESKTOP_HANDS_QUERY = '(min-width: 900px)'; // matches pai.css's .pb-root breakpoint
-
-function sizeBoard() {
-  const wrap = boardEl.querySelector('.pb-wrap');
-  if (!wrap) return;
-  const sideBySide = window.matchMedia(DESKTOP_HANDS_QUERY).matches;
-  const topHand = boardEl.querySelector('.pb-hand[data-slot="top"]');
-  const bottomHand = boardEl.querySelector('.pb-hand[data-slot="bottom"]');
-  const chromeEls = [
-    document.querySelector('.topbar'),
-    document.getElementById('game-badge'),
-    document.getElementById('game-rated'),
-    document.getElementById('game-top-strip'),
-    document.getElementById('game-bottom-strip'),
-    document.getElementById('game-hint'),
-    document.getElementById('game-actions'),
-    document.getElementById('game-moves'),
-    ...(sideBySide ? [] : [topHand, bottomHand]),
-  ];
-  let chromeHeight = 0;
-  for (const el of chromeEls) {
-    if (el && !el.hidden) chromeHeight += el.getBoundingClientRect().height;
-  }
-  const GAPS_RESERVE = 72; // the page's/flex containers' own gaps and padding
-  const availableHeight = window.innerHeight - chromeHeight - GAPS_RESERVE;
-  // Clear any max-width this function set on a previous call before
-  // measuring: that's what makes the width reading accurate once the hands
-  // sit beside the board (≥900px) — the grid column .pb-wrap occupies there
-  // is narrower than its own parent's full width, and a stale max-width
-  // from an earlier, wider layout would otherwise be read back as if it
-  // were the column's real size.
-  wrap.style.maxWidth = 'none';
-  const availableWidth = wrap.getBoundingClientRect().width || 720;
-  const maxSize = sideBySide ? 900 : 820;
-  const size = Math.max(320, Math.min(maxSize, Math.min(availableWidth, availableHeight)));
-  wrap.style.maxWidth = `${Math.floor(size)}px`;
+  syncWakeLock();
 }
 
+// The board's size is pure CSS (pai.css, ".game": a grid whose board cell is a size container),
+// so nothing here measures the window.
 function renderBadge() {
   const el = document.getElementById('game-badge');
   if (el) el.hidden = !ctx.watching;
+  root.classList.toggle('game--watching', !!ctx.watching);
+}
+
+// The name as the strip shows it. A signed-in seat links to the profile (only where the site
+// has accounts); a guest's name is only typed text, so it is italic with a "guest" tag; a bot
+// carries a BOT tag. This keeps a guest called "MushiBot" from passing as the real thing.
+function seatNameHtml(p) {
+  const seat = seats[p];
+  const label = escapeHtml(seatLabel(p));
+  if (!seat || seat.name == null) return label;
+  if (seat.kind === 'bot') return `${label} <span class="strip__tag">BOT</span>`;
+  if (seat.account && seat.username) {
+    return document.body.hasAttribute('data-accounts')
+      ? `<a class="strip__user" href="/@/${encodeURIComponent(seat.username)}">${label}</a>`
+      : label;
+  }
+  if (mode === 'pass') return label;
+  return `<span class="strip__guest">${label}</span> <span class="strip__tag">guest</span>`;
 }
 
 function seatLabel(p) {
@@ -374,7 +618,7 @@ function fillStrip(el, p) {
   const you = ctx.mySeat === p ? ' <span class="muted">(you)</span>' : '';
   const info = ratedPlayer(p);
   const rating = info ? ` <span class="strip__rating" data-rating-seat="${p}">${escapeHtml(ratingText(info))}</span>` : '';
-  el.innerHTML = `<div class="strip__name"><span class="strip__turn-dot"></span>${escapeHtml(seatLabel(p))}${rating}${you}</div>`;
+  el.innerHTML = `<div class="strip__name"><span class="strip__turn-dot"></span>${seatNameHtml(p)}${rating}${you}</div>`;
   const clockEl = document.querySelector(`[data-clock="${p}"]`);
   if (clockEl) el.appendChild(clockEl);
   renderClocks();
@@ -418,6 +662,12 @@ function renderClocks() {
     el.textContent = running && left <= 0 ? 'Time…' : ui.formatClock(left);
     el.classList.toggle('clock--running', running);
     el.classList.toggle('clock--low', left < 10000);
+    if (running && left < 10000 && left > 0 && ctx.mySeat === seat && !lowTimeSounded[seat]) {
+      lowTimeSounded[seat] = true;
+      sound.play('lowtime');
+      sound.buzz([60, 80, 60]);
+    }
+    if (left >= 10000) lowTimeSounded[seat] = false;
     el.classList.toggle('clock--warn', left >= 10000 && left < 30000);
   });
 }
@@ -438,7 +688,7 @@ function tickClocks() {
 // One fetch that lets the server settle (and push) the result; nothing is decided here.
 async function refetchGame() {
   try {
-    onGameData(await ui.api(gamePollUrl()));
+    onGameData(await ui.api(`/api/game/${gid}`, { headers: seatHeaders(ctx.token) }));
   } catch (e) {
     if (e && e.status === 404) showExpired();
   }
@@ -459,6 +709,10 @@ function turnAction() {
 function renderHint() {
   const el = document.getElementById('game-hint');
   if (!el) return;
+  if (viewPly !== null) {
+    el.textContent = `Move ${viewPly} of ${(state.history || []).length} - Live (End) returns to the game`;
+    return;
+  }
   if (over) {
     el.textContent = state.message || '';
     return;
@@ -511,7 +765,11 @@ function renderActions() {
   const el = document.getElementById('game-actions');
   if (!el) return;
   el.innerHTML = '';
-  if (over || ctx.watching) return;
+  const flipBtn = () => actionButton('flip-btn', 'Flip', 'btn-quiet', toggleFlip);
+  if (over || ctx.watching) {
+    el.appendChild(flipBtn());
+    return;
+  }
 
   if (state.can_skip_bonus && isMyTurnNow()) {
     el.appendChild(actionButton('skip-btn', 'Skip bonus', 'btn-secondary', skipBonus));
@@ -523,22 +781,190 @@ function renderActions() {
     el.appendChild(actionButton('undo-btn', 'Undo', 'btn-quiet', doUndo));
     if (canRedo) el.appendChild(actionButton('redo-btn', 'Redo', 'btn-quiet', doRedo));
   }
-  el.appendChild(actionButton('share-btn', 'Share', 'btn-quiet', shareLink));
+  el.appendChild(flipBtn());
+  // The seat is still open: the one useful link invites an opponent, and a watcher who opened
+  // it would be offered the seat, so only "Invite to play" is shown. Once both seats are
+  // filled the link can only be watched.
+  if (mode === 'human' && hasOpenSeat()) {
+    el.appendChild(actionButton('invite-btn', 'Invite to play', 'btn-secondary', () => shareGameLink('invite')));
+  } else {
+    el.appendChild(actionButton('share-btn', 'Share to watch', 'btn-quiet', () => shareGameLink('watch')));
+  }
+}
+
+// ----------------------------------------------------------------- move list
+//
+// PSN, as the engine writes it (psnTurns in board.js): a table of turns (Guest | Host) on a wide
+// window, a horizontal strip on a phone. Tapping a move, or the arrow keys, shows the position
+// after it, read-only (fetched once from /api/game/{gid}/position/{ply} and cached); "Live"
+// (End) returns. New moves keep arriving underneath without pulling the board away.
+
+function realPlies() {
+  // ply numbers worth stopping on: 0, then the history length after every move that is not a skip
+  const out = [0];
+  (state.history || []).forEach((m, i) => { if (!Array.isArray(m) || m[0] !== 'skip_bonus') out.push(i + 1); });
+  return out;
+}
+
+let viewReq = 0;          // the newest review request; an older one that finishes late is dropped
+
+async function showPly(ply) {
+  const n = (state.history || []).length;
+  const plies = realPlies();
+  if (ply >= plies[plies.length - 1]) { goLive(); return; }
+  ply = Math.max(0, Math.min(ply, n));
+  const req = ++viewReq;
+  if (!positions.has(ply)) {
+    try {
+      const r = await ui.api(`/api/game/${gid}/position/${ply}`, { headers: seatHeaders(ctx.token) });
+      positions.set(ply, r.state);
+    } catch (e) {
+      if (req === viewReq) goLive();
+      return;
+    }
+  }
+  if (req !== viewReq) return;
+  // Review starts only once the position is in hand, so the live board is never shown under a
+  // "reviewing" label.
+  viewPly = ply;
+  clearSelection();
+  renderAll();
+}
+
+function goLive() {
+  viewReq++;
+  viewPly = null;
+  renderAll();
+}
+
+function stepPly(direction) {
+  if (!state) return;
+  const plies = realPlies();
+  const cur = viewPly === null ? plies[plies.length - 1] : viewPly;
+  const target = direction < 0
+    ? [...plies].reverse().find((p) => p < cur)
+    : plies.find((p) => p > cur);
+  if (target !== undefined) showPly(target);
+}
+
+function turnCell(t) {
+  const shownPly = viewPly === null ? Infinity : viewPly;
+  const cur = (ply) => (viewPly === null ? ply === realPlies().slice(-1)[0] : ply === shownPly);
+  let html = `<span class="mv-turn is-p${t.player || 1}"><button type="button" class="mv-cell" data-ply="${t.mainPly}"`
+    + `${cur(t.mainPly) ? ' aria-current="true"' : ''}>${escapeHtml(t.main)}</button>`;
+  if (t.bonus) {
+    html += `<button type="button" class="mv-cell mv-bonus" data-ply="${t.bonusPly}"`
+      + `${cur(t.bonusPly) ? ' aria-current="true"' : ''}>+${escapeHtml(t.bonus)}</button>`;
+  }
+  return `${html}</span>`;
+}
+
+let psnUrl = null;
+
+function psnText() {
+  const accents = (state.setup && state.setup.accents) || {};
+  const result = { 1: '1-0', 2: '0-1', 0: '1/2-1/2' }[state.winner] || '*';
+  const turns = psnTurns(state.history || [], state.history_players || []);
+  const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  const tag = (k, v) => `[${k} "${String(v).replace(/"/g, "'")}"]`;
+  const lines = [
+    tag('Event', 'Pai Sho Lab Game'), tag('Date', stamp),
+    tag('Player1', seatLabel(1)), tag('Player2', seatLabel(2)),
+    tag('GuestAccents', (accents['1'] || []).join(',')), tag('HostAccents', (accents['2'] || []).join(',')),
+    tag('Opening', (state.setup && state.setup.opening) || 'Informal'), tag('Result', result),
+  ];
+  if (state.end_reason) lines.push(tag('Termination', state.end_reason));
+  lines.push(tag('Turns', turns.length), '');
+  lines.push(...psnMoveLines(state.history || [], state.history_players || [], !!state.bonus_turn));
+  return `${lines.join('\n')}\n`;
 }
 
 function renderMoves() {
   const list = document.getElementById('game-move-list');
-  const details = document.getElementById('game-moves');
-  if (!list || !details) return;
-  const history = state.history || [];
-  const players = state.history_players || [];
-  list.innerHTML = history.map((move, i) => {
-    const p = players.length === history.length ? players[i] : (i % 2 === 0 ? 1 : 2);
-    return `<li class="is-p${p}">${i + 1}. ${escapeHtml(formatMove(move))}</li>`;
-  }).join('');
-  const summary = details.querySelector('summary');
-  if (summary) summary.textContent = `Moves (${history.length})`;
+  const liveBtn = document.getElementById('mv-live');
+  if (!list) return;
+  const turns = psnTurns(state.history || [], state.history_players || []);
+  list.innerHTML = turns.map((t, i) => (i % 2 === 0
+    ? `<li class="mv-row"><span class="mv-no">${i / 2 + 1}.</span>${turnCell(t)}`
+    : `${turnCell(t)}</li>`)).join('') + (turns.length % 2 === 1 ? '</li>' : '');
+  if (viewPly === null) {
+    list.scrollTop = list.scrollHeight;
+    list.scrollLeft = list.scrollWidth;
+  } else {
+    const cur = list.querySelector('[aria-current="true"]');
+    if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+  if (liveBtn) liveBtn.hidden = viewPly === null;
+  const dl = document.getElementById('mv-download');
+  if (dl) {
+    dl.hidden = !over || turns.length === 0;
+    if (!dl.hidden) {
+      if (psnUrl) URL.revokeObjectURL(psnUrl);
+      psnUrl = URL.createObjectURL(new Blob([psnText()], { type: 'text/plain' }));
+      dl.href = psnUrl;
+    }
+  }
+  document.querySelectorAll('#mv-nav [data-nav]').forEach((btn) => {
+    const plies = realPlies();
+    const cur = viewPly === null ? plies[plies.length - 1] : viewPly;
+    const atStart = cur === 0;
+    const atEnd = viewPly === null;
+    btn.disabled = ((btn.dataset.nav === 'first' || btn.dataset.nav === 'prev') && atStart)
+      || ((btn.dataset.nav === 'next' || btn.dataset.nav === 'last') && atEnd);
+  });
 }
+
+document.getElementById('game-moves').addEventListener('click', (e) => {
+  const cell = e.target.closest('.mv-cell');
+  if (cell) { showPly(Number(cell.dataset.ply)); return; }
+  const nav = e.target.closest('[data-nav]');
+  if (nav) {
+    if (nav.dataset.nav === 'first') showPly(0);
+    else if (nav.dataset.nav === 'prev') stepPly(-1);
+    else if (nav.dataset.nav === 'next') stepPly(1);
+    else goLive();
+    return;
+  }
+  if (e.target.closest('#mv-live')) goLive();
+});
+
+function toggleFlip() {
+  flipOverride = !flipOverride;
+  renderAll();
+}
+
+// Keyboard: arrows and Home/End walk the move list, `f` flips, `s` skips a bonus, Esc deselects
+// (or leaves review), `?` lists them. Ignored while typing, with a modifier held, or while the
+// focus is on the board, where the arrows move between points (board.js).
+function showShortcuts() {
+  ui.sheet(`
+    <h2>Keyboard</h2>
+    <ul class="shortcut-list">
+      <li><kbd>&larr;</kbd> <kbd>&rarr;</kbd> previous / next move</li>
+      <li><kbd>Home</kbd> <kbd>End</kbd> first move / back to the live game</li>
+      <li><kbd>f</kbd> flip the board</li>
+      <li><kbd>s</kbd> skip a Harmony Bonus</li>
+      <li><kbd>Esc</kbd> deselect, or leave review</li>
+      <li>On the board: arrows move between points, <kbd>Enter</kbd> selects or plays</li>
+    </ul>`);
+}
+
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || !state) return;
+  const t = e.target;
+  if (t && (t.closest('input, textarea, select, [contenteditable]') || t.closest('.sheet'))) return;
+  const onBoard = t && t.closest && t.closest('.pb-grid');
+  if (!onBoard && e.key === 'ArrowLeft') { e.preventDefault(); stepPly(-1); }
+  else if (!onBoard && e.key === 'ArrowRight') { e.preventDefault(); stepPly(1); }
+  else if (e.key === 'Home') { e.preventDefault(); showPly(0); }
+  else if (e.key === 'End') { e.preventDefault(); goLive(); }
+  else if (e.key === 'Escape') {
+    if (viewPly !== null) goLive();
+    else if (selection) { clearSelection(); renderAll(); }
+  } else if (e.key === 'f') toggleFlip();
+  else if (e.key === 's' && state.can_skip_bonus && isMyTurnNow()) skipBonus();
+  else if (e.key === '?') showShortcuts();
+});
 
 // ------------------------------------------------------------------ action handlers
 
@@ -613,13 +1039,14 @@ async function doRedo() {
   }
 }
 
-async function shareLink() {
-  try {
-    await navigator.clipboard.writeText(location.href);
-    flashHint('Link copied');
-  } catch (e) {
-    flashHint('Could not copy the link');
-  }
+async function shareGameLink(kind) {
+  const url = new URL(`/game/${gid}`, location.origin).href;
+  const invite = kind === 'invite';
+  const result = await ui.shareLink({
+    url, title: invite ? 'Play me at Skud Pai Sho' : 'Watch this Skud Pai Sho game',
+  });
+  if (result === 'copied') flashHint(invite ? 'Invite link copied' : 'Watch link copied');
+  else if (result === 'failed') flashHint('Could not copy the link');
 }
 
 // -------------------------------------------------------------- bot driver
@@ -651,8 +1078,10 @@ function maybeOfferJoin() {
   const close = ui.sheet(`
     <h2>Join this game</h2>
     <p class="muted">Take the open seat and start playing.</p>
+    ${ui.inAppBrowserNote('Your seat is kept in this app\'s own storage and is lost when you switch.')}
     <label class="game__field">Your name
-      <input id="join-name" type="text" maxlength="24" placeholder="${escapeHtml(ui.nickname())}">
+      <input id="join-name" type="text" maxlength="24" placeholder="${escapeHtml(ui.nickname())}"
+             autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
     </label>
     <div class="game__sheet-actions">
       <button type="button" class="btn btn-primary" id="join-btn">Take the seat</button>
@@ -667,7 +1096,7 @@ function maybeOfferJoin() {
       const r = await ui.api(`/api/join/${gid}`, { method: 'POST', body: { nickname: name } });
       ui.setSeatToken(gid, r.seat, r.seat_token);
       close();
-      const data = await ui.api(`/api/game/${gid}`);
+      const data = await ui.api(`/api/game/${gid}`, { headers: seatHeaders(r.seat_token) });
       onGameData(data);
       ensureSubscribed();   // re-subscribe with the new seat token
     } catch (e) {
@@ -756,6 +1185,7 @@ function showShareSheet(joinUrl) {
 function maybeShowResultSheet() {
   if (!over || resultShown) return;
   resultShown = true;
+  sound.play('end');
   const close = ui.sheet(`
     <h2 id="result-title">${escapeHtml(resultHeadline())}</h2>
     <p class="muted">${escapeHtml(resultDetail())}</p>
@@ -787,6 +1217,8 @@ function showExpired() {
 }
 
 function onGameData(data) {
+  clearPending();
+  giveMoveFeedback(state, data.state);
   state = data.state;
   lastPly = (state.history || []).length;
   mode = data.mode;
@@ -838,8 +1270,8 @@ function syncPolling() {
 // Spectators must never keep a game's idle timer alive just by polling it
 // (as the old Flask player API did) - only a seated player's own poll does,
 // by sending its seat_token.
-function gamePollUrl() {
-  return ctx.token ? `/api/game/${gid}?seat_token=${encodeURIComponent(ctx.token)}` : `/api/game/${gid}`;
+function seatHeaders(token) {
+  return token ? { 'X-Seat-Token': token } : undefined;
 }
 
 async function pollOnce() {
@@ -848,7 +1280,7 @@ async function pollOnce() {
     return;
   }
   try {
-    const data = await ui.api(gamePollUrl());
+    const data = await ui.api(`/api/game/${gid}`, { headers: seatHeaders(ctx.token) });
     const prevOpen = hasOpenSeat();
     if (wsLive) {
       // The socket owns the board; this poll only learns who sits where.
@@ -901,12 +1333,15 @@ function sameShown(a, b) {
 function onSocketState(msg) {
   if (!state) return;                 // the first HTTP load hasn't landed yet
   wsLive = true;
+  publishDebugHook();
+  const answered = clearPending();    // the server's word replaces any prediction
   // `ply` is just len(history), not a version: undo/redo (from any tab) legitimately lowers
   // it, and pushes arrive in order on one socket, so every push is accepted; exact
   // duplicates are dropped by sameShown below.
   lastPly = msg.ply;
   if (!sameShown(state, msg.state)) {
     const moved = (state.history || []).length !== (msg.state.history || []).length;
+    giveMoveFeedback(state, msg.state);
     state = msg.state;
     over = !!msg.over || (state.winner !== null && state.winner !== undefined);
     noteClock();
@@ -920,6 +1355,9 @@ function onSocketState(msg) {
   } else if (JSON.stringify(state.clock) !== JSON.stringify(msg.state.clock)) {
     state.clock = msg.state.clock;      // same position, new clock reading (e.g. the clock started)
     noteClock();
+    if (answered) renderAll();
+  } else if (answered) {
+    renderAll();
   }
   syncPolling();
 }
@@ -930,8 +1368,8 @@ function ensureSubscribed() {
   window.MushiLive.subscribeGame(gid, token, onSocketState, {
     // A (re)connect delivers a fresh snapshot, which is authoritative even if its ply
     // is lower than what we last showed (e.g. an undo done from another tab).
-    onUp: () => { lastPly = -1; },
-    onDown: () => { wsLive = false; syncPolling(); },
+    onUp: () => { lastPly = -1; setConnected(true); },
+    onDown: () => { wsLive = false; setConnected(false); syncPolling(); },
   });
 }
 
@@ -942,8 +1380,7 @@ async function init() {
     // visit is known up front - send it so even the very first load, a
     // reload, counts as the seated player's own poll.
     const stored = ui.seatToken(gid);
-    const url = stored ? `/api/game/${gid}?seat_token=${encodeURIComponent(stored.token)}` : `/api/game/${gid}`;
-    const data = await ui.api(url);
+    const data = await ui.api(`/api/game/${gid}`, { headers: seatHeaders(stored && stored.token) });
     onGameData(data);
     ensureSubscribed();
   } catch (e) {

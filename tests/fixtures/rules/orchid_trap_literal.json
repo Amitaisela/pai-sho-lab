@@ -1,0 +1,6 @@
+{"name": "orchid_trap_literal", "ref": "PDF p.12: Opponent's Flower Tiles on any of the 8 points surrounding the Orchid are trapped. Trapped Flower Tiles may not be moved when Arranging.",
+ "note": "Literal reading (owner decision 2026-10-15): the trap does not depend on either tile growing. A growing Rose in a gate next to a blooming enemy Orchid is trapped; a blooming Rose next to a growing enemy Orchid (in a gate) is trapped; the Orchid's own player is never trapped by it.",
+ "state": {"board": {"1,9": "Rose/1/g", "2,9": "Orchid/2",
+                     "9,17": "Orchid/2/g", "9,16": "Rose/1", "10,16": "Jasmine/2"}},
+ "checks": [{"destinations_exclude": {"1,9": [[1,8], [1,10]], "9,16": [[9,15], [9,14]]}},
+            {"destinations_include": {"10,16": [[10,15]]}}]}

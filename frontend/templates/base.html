@@ -2,18 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#161512" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f1efe8" media="(prefers-color-scheme: light)">
   <title>{% block title %}Pai Sho Lab{% endblock %}</title>
-  <script>
-    // Applied before first paint so a saved manual theme choice doesn't flash
-    // the system-default theme for a frame; ui.js's initChrome() is the
-    // source of truth after that.
-    try {
-      var t = localStorage.getItem('pai_theme');
-      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
-    } catch (e) {}
-  </script>
+  <script src="/static/js/theme-init.js"></script>
   <link rel="icon" href="/static/tiles/GL.png">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="stylesheet" href="/static/css/pai.css">
   {% block head %}{% endblock %}
 </head>
@@ -21,8 +19,14 @@
   <header class="topbar">
     <a class="topbar__brand" href="/">
       <img class="topbar__logo" src="/static/tiles/GL.png" alt="" width="28" height="28">
-      Pai Sho Lab
+      <span class="topbar__name">Pai Sho Lab</span>
     </a>
+    <nav class="topbar__nav" aria-label="Main">
+      <a href="/">Play</a>
+      <a href="/learn">Learn</a>
+      <a href="/bots">Bots</a>
+      <a href="/developers">Developers</a>
+    </nav>
     <div class="topbar__right">
       <button type="button" class="chip" data-nickname-chip aria-label="Your nickname">Guest</button>
       <button type="button" class="menu-btn" data-menu-btn aria-label="Menu">
@@ -36,10 +40,7 @@
     {% block content %}{% endblock %}
   </main>
 
-  <script type="module">
-    import * as ui from '/static/js/ui.js';
-    ui.initChrome();
-  </script>
+  <script type="module" src="/static/js/chrome-init.js"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

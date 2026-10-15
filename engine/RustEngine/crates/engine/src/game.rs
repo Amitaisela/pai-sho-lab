@@ -1,7 +1,7 @@
 //! The game state (`Board`: pieces, hands, whose turn, bonus, setup, outcome)
 //! and the rules that read it: arrange destinations (movement, gates, gardens,
-//! captures, the Orchid trap, no clash), legal-action generation with the
-//! no-stranding filter, and the Wheel/Boat accent rules. Applying actions and
+//! captures, the Orchid trap, no clash), legal-action generation and the
+//! Wheel/Boat accent rules. Applying actions and
 //! ending turns lives in `moves`; harmonies, clashes and rings in `harmony`.
 //! Ported from `PaiShoGame.py`'s `PaiShoGame` class.
 
@@ -175,16 +175,14 @@ impl Board {
         destinations
     }
 
-    /// Orchid trap: an opponent's blooming flower tile next to a blooming Orchid can't arrange.
+    /// Orchid trap (rulebook p.12, literal reading): an opponent's flower tile on any of the 8
+    /// points around an Orchid can't be moved by Arranging, whether or not either tile is growing.
     fn is_trapped(&self, at: Position, piece: Piece) -> bool {
-        if piece.growing {
-            return false;
-        }
         let enemy = piece.player.other();
         NEIGHBOURS_8.iter().any(|&(dr, dc)| {
             matches!(
                 self.pieces.get(&Position::new(at.row + dr, at.col + dc)),
-                Some(p) if p.tile == Tile::Special(SpecialTile::Orchid) && p.player == enemy && !p.growing
+                Some(p) if p.tile == Tile::Special(SpecialTile::Orchid) && p.player == enemy
             )
         })
     }
@@ -348,9 +346,7 @@ impl Board {
         }
         let mut actions = Vec::new();
         self.visit_candidates(&mut |a| {
-            if self.opponent_can_move_after(&a) {
-                actions.push(a);
-            }
+            actions.push(a);
             false
         });
         if self.bonus_turn {
@@ -359,46 +355,14 @@ impl Board {
         actions
     }
 
-    /// No stranding: after `action` (as if the turn ended), the opponent can still Plant
-    /// or Arrange. Ported from `PaiShoGame._opponent_can_move_after`.
-    fn opponent_can_move_after(&self, action: &Action) -> bool {
-        let opponent = self.current_player.other();
-        if self.basic_count(opponent) > 0 {
-            let mut open: Vec<Position> = GATES.into_iter().filter(|g| !self.pieces.contains_key(g)).collect();
-            match *action {
-                Action::Plant { at, .. } if GATES.contains(&at) => open.retain(|&g| g != at),
-                Action::Arrange { from, .. } if GATES.contains(&from) => open.push(from),
-                _ => {}
-            }
-            if !open.is_empty() {
-                return true;
-            }
-        }
-        let mut sim = self.clone();
-        sim.apply_effects(*action);
-        sim.can_move(opponent)
-    }
-
-    /// Whether `player` would have any Plant or Arrange on a normal turn. Ported from
-    /// `PaiShoGame._can_move`.
-    pub(crate) fn can_move(&self, player: Player) -> bool {
-        if self.basic_count(player) > 0 && GATES.iter().any(|g| !self.pieces.contains_key(g)) {
-            return true;
-        }
-        self.pieces
-            .iter()
-            .any(|(&pos, p)| p.player == player && !matches!(p.tile, Tile::Accent(_)) && self.has_any_destination(pos))
-    }
-
     /// Same answer as `!legal_actions().is_empty()` while `bonus_turn` is false (the only
     /// way `end_turn` calls it), but stops at the first legal candidate.
     pub(crate) fn has_any_legal_action(&self) -> bool {
-        self.winner.is_none() && (self.bonus_turn || self.visit_candidates(&mut |a| self.opponent_can_move_after(&a)))
+        self.winner.is_none() && (self.bonus_turn || self.visit_candidates(&mut |_| true))
     }
 
     /// Calls `visit` on every candidate action for the side to move (rulebook p.8),
-    /// before the no-stranding filter, and stops as soon as `visit` returns true;
-    /// returns whether it stopped early. Ported from `PaiShoGame._iter_candidate_actions`.
+    /// and stops as soon as `visit` returns true; returns whether it stopped early. Ported from `PaiShoGame._iter_candidate_actions`.
     fn visit_candidates(&self, visit: &mut dyn FnMut(Action) -> bool) -> bool {
         let player = self.current_player;
         let hand = &self.hands[&player];
@@ -689,6 +653,35 @@ mod tests {
 
         assert_eq!(a.board_sig(), b.board_sig());
         assert_ne!(a.state_sig(), b.state_sig());
+    }
+
+    fn growing_piece(tile: Tile, player: Player) -> Piece {
+        Piece { tile, player, growing: true }
+    }
+
+    #[test]
+    fn orchid_traps_a_growing_tile_in_a_gate() {
+        // Rulebook p.12, literal reading: growing or not, flower tiles around an enemy Orchid are trapped.
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(1, 9), growing_piece(Tile::Flower(Flower::Rose), Player::One));
+        board.pieces.insert(Position::new(2, 9), piece(Tile::Special(SpecialTile::Orchid), Player::Two));
+        assert!(board.valid_destinations(Position::new(1, 9)).is_empty());
+    }
+
+    #[test]
+    fn a_growing_orchid_traps_adjacent_enemy_tiles() {
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(9, 17), growing_piece(Tile::Special(SpecialTile::Orchid), Player::Two));
+        board.pieces.insert(Position::new(9, 16), piece(Tile::Flower(Flower::Rose), Player::One));
+        assert!(board.valid_destinations(Position::new(9, 16)).is_empty());
+    }
+
+    #[test]
+    fn orchid_never_traps_its_owners_tiles() {
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(5, 9), piece(Tile::Special(SpecialTile::Orchid), Player::Two));
+        board.pieces.insert(Position::new(5, 10), piece(Tile::Flower(Flower::Rose), Player::Two));
+        assert!(!board.valid_destinations(Position::new(5, 10)).is_empty());
     }
 
     #[test]

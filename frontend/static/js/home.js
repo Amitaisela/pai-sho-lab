@@ -1,19 +1,23 @@
-/* Pai Sho Lab — the home page (`/`).
+/* Pai Sho Lab — the home page (`/`), a lobby in the Lichess style.
  *
- * Three ways to play a person (quick match, challenge a friend, pass and
- * play), the MushiBot level row, and the live-games list. Every mutating
- * call goes through ui.js's api()/clientId()/nickname()/setSeatToken(); this
- * file owns only what's specific to the home page.
+ * A grid of time-control tiles that each start a quick match in one tap, the open games waiting
+ * for an opponent, three other ways to play (a friend, MushiBot, pass and play), and the live
+ * games as mini boards. Every mutating call goes through ui.js's
+ * api()/clientId()/nickname()/setSeatToken(); this file owns only what's specific to the home
+ * page.
  */
 import * as ui from '/static/js/ui.js';
 
 // Phase 0b calibrated ratings (approximate), shown as a tooltip on each level
 // chip. Not fetched from the server — the brief keeps this as a small static
-// map rather than wiring a new field through /api/house_bots.
+// map rather than wiring a new field through /api/house_bots. They are on the bots' own
+// scale (Bradley-Terry against each other), not the 1500-centred Glicko-2 scale that people are
+// rated on, so the UI labels them as such rather than letting them read as site ratings.
 const LEVEL_RATINGS = { 1: 225, 2: 300, 3: 311, 4: 385, 5: 397, 6: 476 };
 const ACCENTS = ['Rock', 'Wheel', 'Knotweed', 'Boat'];
 
 let selectedLevel = 1;
+let selectedSeat = 'random';   // the colour for a MushiBot game: 'random', 1 (Guest, moves first) or 2 (Host)
 let currentSetup = null; // {opening, accents} | null — applied to the next game
 let qmPollTimer = null;
 let qmSeekId = null;
@@ -48,15 +52,31 @@ function ratedChoice() {
   return ratedAllowed() && storedRated();
 }
 
+// Why "Rated" is unavailable right now, or '' when it is. A guest still sees the toggle (so rated
+// play is discoverable) but the Rated chip says what it needs.
+function ratedBlockedReason() {
+  const acct = ui.getAccountState();
+  if (!acct.signedIn) return 'Sign in to play rated games';
+  if (!acct.username) return 'Choose a username to play rated games';
+  if (ui.timeControl() === 'untimed') return 'Rated games need a time control';
+  return '';
+}
+
 function syncRatedToggle() {
   const el = document.getElementById('rated-toggle');
   if (!el) return;
-  el.hidden = !ratedAllowed();
+  // Where there are no accounts (the Lab, the public mirror) there is nothing to toggle.
+  el.hidden = !document.body.hasAttribute('data-accounts');
   const rated = ratedChoice();
+  const reason = ratedBlockedReason();
   el.querySelectorAll('[data-rated]').forEach((b) => {
     const on = (b.dataset.rated === 'rated') === rated;
     b.classList.toggle('is-selected', on);
     b.setAttribute('aria-pressed', String(on));
+    if (b.dataset.rated === 'rated') {
+      b.classList.toggle('is-blocked', !!reason);
+      b.title = reason;
+    }
   });
 }
 
@@ -65,6 +85,11 @@ function wireRatedToggle() {
   if (!el) return;
   el.querySelectorAll('[data-rated]').forEach((b) => {
     b.addEventListener('click', () => {
+      const reason = b.dataset.rated === 'rated' ? ratedBlockedReason() : '';
+      if (reason) {
+        ui.sheet(`<h2>${escapeHtml(reason)}</h2><p class="muted">Rated games are between signed-in players and change both ratings.</p>`);
+        return;
+      }
       try { localStorage.setItem(RATED_KEY, b.dataset.rated); } catch (e) { /* private mode */ }
       syncRatedToggle();
     });
@@ -195,7 +220,9 @@ function tickSeekAges() {
 
 function renderSeeks(rows) {
   const el = document.getElementById('quick-match-seeks');
+  const empty = document.getElementById('quick-match-empty');
   if (!el) return;
+  if (empty) empty.hidden = rows.length > 0;
   const now = performance.now();
   const live = new Set(rows.map((r) => r.seek_id));
   for (const id of [...seekFirstSeen.keys()]) if (!live.has(id)) seekFirstSeen.delete(id);
@@ -212,9 +239,9 @@ function renderSeeks(rows) {
     <li><button type="button" class="qm-seek-item" data-seek-id="${escapeHtml(r.seek_id)}"
       data-time-control-of-seek="${escapeHtml(r.time_control || 'untimed')}"
       data-rated-seek="${r.rated ? 'true' : 'false'}">
-      ${escapeHtml(r.nickname)}${r.rating != null ? ` (${escapeHtml(r.rating)})` : ''} is waiting &mdash; tap to play
-      <span class="muted">${escapeHtml(r.time_control || 'untimed')}</span>
-      ${r.rated ? '<span class="rated-tag">Rated</span>' : ''}
+      <span class="qm-who">${escapeHtml(r.nickname)}${r.rating != null ? ` <span class="muted">(${escapeHtml(r.rating)})</span>` : ''}</span>
+      <span class="qm-tc">${escapeHtml(r.time_control || 'untimed')}</span>
+      ${r.rated ? '<span class="rated-tag">Rated</span>' : '<span class="qm-mode muted">Casual</span>'}
       <span class="muted qm-seek-age" data-seek-id="${escapeHtml(r.seek_id)}">${seekAgeText(r.seek_id)}</span>
     </button></li>
   `).join('');
@@ -236,6 +263,25 @@ function qrSvgFor(url) {
   } catch (e) {
     return '';
   }
+}
+
+function openFriendSheet() {
+  const close = ui.sheet(`
+    <h2>Play with a friend</h2>
+    <p class="muted">Pick a time control, then send the link. They take the other seat.</p>
+    <div class="time-control"><div data-time-control-mount></div></div>
+    <p id="friend-rated-note" class="muted" hidden>Rated game: both players need an account.</p>
+    <button type="button" class="btn btn-primary" id="friend-create-btn">Create link</button>
+  `);
+  document.querySelectorAll('.sheet [data-time-control-mount]').forEach((el) => ui.mountTimeControlPicker(el));
+  const note = document.getElementById('friend-rated-note');
+  const syncNote = () => { note.hidden = !ratedChoice(); };
+  syncNote();
+  document.querySelector('.sheet').addEventListener('click', syncNote);
+  document.getElementById('friend-create-btn').addEventListener('click', () => {
+    close();
+    startChallenge();
+  });
 }
 
 async function startChallenge() {
@@ -279,7 +325,7 @@ async function startChallenge() {
     const shareBtn = document.getElementById('challenge-share-btn');
     shareBtn.hidden = false;
     shareBtn.addEventListener('click', () => {
-      navigator.share({ title: 'Pai Sho Lab', url }).catch(() => {});
+      navigator.share({ title: 'Play me at Skud Pai Sho', url }).catch(() => {});
     });
   }
   document.getElementById('challenge-open-btn').addEventListener('click', () => {
@@ -303,7 +349,8 @@ async function startPassAndPlay() {
 function updateLevelLine() {
   const line = document.getElementById('bot-level-line');
   if (!line) return;
-  line.textContent = `MushiBot level ${selectedLevel} · ≈ ${LEVEL_RATINGS[selectedLevel] ?? '?'}`;
+  line.textContent = `MushiBot level ${selectedLevel} \u00b7 bot-scale strength \u2248 ${LEVEL_RATINGS[selectedLevel] ?? '?'}`
+    + ' (not comparable to the ratings people have)';
 }
 
 function renderLevelChips(bots) {
@@ -311,7 +358,7 @@ function renderLevelChips(bots) {
   if (!row) return;
   row.innerHTML = bots.map((b) => `
     <button type="button" class="chip chip--level${b.level === selectedLevel ? ' is-selected' : ''}"
-      data-level="${b.level}" title="&asymp; ${LEVEL_RATINGS[b.level] ?? '?'} rating">${b.level}</button>
+      data-level="${b.level}" title="Level ${b.level}: bot-scale strength &asymp; ${LEVEL_RATINGS[b.level] ?? '?'}">${b.level}</button>
   `).join('');
   row.querySelectorAll('.chip--level').forEach((chip) => {
     chip.addEventListener('click', () => {
@@ -335,12 +382,47 @@ async function loadHouseBots() {
   renderLevelChips(bots);
 }
 
+function openBotSheet() {
+  const close = ui.sheet(`
+    <h2>Play MushiBot</h2>
+    <p class="muted time-control__label">Level</p>
+    <div id="bot-level-row" class="chip-row"></div>
+    <p id="bot-level-line" class="muted bot-level-line"></p>
+    <p class="muted time-control__label">You play</p>
+    <div class="chip-row" id="bot-seat-row" role="group" aria-label="Colour">
+      <button type="button" class="chip" data-seat="1">Guest (first)</button>
+      <button type="button" class="chip" data-seat="random">Random</button>
+      <button type="button" class="chip" data-seat="2">Host</button>
+    </div>
+    <p class="muted time-control__label">Time control</p>
+    <div class="time-control"><div data-time-control-mount></div></div>
+    <button type="button" class="btn btn-primary" id="bot-play-btn">Play</button>
+  `);
+  document.querySelectorAll('.sheet [data-time-control-mount]').forEach((el) => ui.mountTimeControlPicker(el));
+  const seatRow = document.getElementById('bot-seat-row');
+  const syncSeat = () => seatRow.querySelectorAll('[data-seat]').forEach((c) => {
+    const on = c.dataset.seat === String(selectedSeat);
+    c.classList.toggle('is-selected', on);
+    c.setAttribute('aria-pressed', String(on));
+  });
+  seatRow.querySelectorAll('[data-seat]').forEach((c) => c.addEventListener('click', () => {
+    selectedSeat = c.dataset.seat === 'random' ? 'random' : Number(c.dataset.seat);
+    syncSeat();
+  }));
+  syncSeat();
+  loadHouseBots();
+  document.getElementById('bot-play-btn').addEventListener('click', () => {
+    close();
+    playBot();
+  });
+}
+
 async function playBot() {
   let data;
   try {
     data = await ui.api('/api/bot_game', {
       method: 'POST',
-      body: { level: selectedLevel, seat: 'random', nickname: ui.nickname(), time_control: ui.timeControl() },
+      body: { level: selectedLevel, seat: selectedSeat, nickname: ui.nickname(), time_control: ui.timeControl() },
     });
   } catch (e) {
     return;
@@ -360,6 +442,19 @@ async function refreshLive() {
   renderLive(rows);
 }
 
+// A mini board for the lobby: the circle, the diamond, and one dot per tile, blue for the Guest
+// and orange for the Host (a dashed ring while growing). `board` is {"row,col": [player, growing]}.
+function miniBoardSvg(board) {
+  const dots = Object.entries(board || {}).map(([k, v]) => {
+    const [r, c] = k.split(',').map(Number);
+    return `<circle cx="${c + 0.5}" cy="${r + 0.5}" r="0.46" class="mini-p${v[0]}${v[1] ? ' mini-growing' : ''}"/>`;
+  }).join('');
+  return '<svg class="mini-board" viewBox="0 0 19 19" aria-hidden="true">'
+    + '<circle cx="9.5" cy="9.5" r="9.4" class="mini-bg"/>'
+    + '<path d="M9.5 2.5 L16.5 9.5 L9.5 16.5 L2.5 9.5 Z" class="mini-diamond"/>'
+    + `${dots}</svg>`;
+}
+
 function renderLive(rows) {
   const el = document.getElementById('live-list');
   if (!el) return;
@@ -369,7 +464,9 @@ function renderLive(rows) {
   }
   el.innerHTML = rows.map((r) => `
     <a class="live-card" href="/game/${escapeHtml(r.game_id)}">
-      ${escapeHtml(r.names[0] || 'Player 1')} vs ${escapeHtml(r.names[1] || 'Player 2')} &middot; ${r.moves} moves
+      ${miniBoardSvg(r.board)}
+      <span class="live-card__names">${escapeHtml(r.names[0] || 'Player 1')} <span class="muted">vs</span> ${escapeHtml(r.names[1] || 'Player 2')}</span>
+      <span class="muted live-card__moves">${r.moves} moves</span>
     </a>
   `).join('');
 }
@@ -438,18 +535,22 @@ function openCustomGameSheet() {
 // ------------------------------------------------------------------- init
 
 function wire() {
-  // Wrapped in a lambda, not passed directly: addEventListener hands the
-  // click Event as the first arg, which would otherwise land in
-  // startQuickMatch's seekId parameter.
-  document.getElementById('quick-match-tile').addEventListener('click', () => startQuickMatch());
-  document.getElementById('challenge-tile').addEventListener('click', startChallenge);
+  // A time-control tile sets the saved time control and starts a quick match with it. Wrapped in
+  // a lambda: addEventListener hands the click Event as the first argument, which would
+  // otherwise land in startQuickMatch's seekId parameter.
+  document.querySelectorAll('#pairing-grid [data-pair]').forEach((tile) => {
+    tile.addEventListener('click', () => {
+      ui.setTimeControl(tile.dataset.pair);
+      syncRatedToggle();
+      startQuickMatch();
+    });
+  });
+  document.getElementById('challenge-tile').addEventListener('click', openFriendSheet);
+  document.getElementById('bot-open-btn').addEventListener('click', openBotSheet);
   document.getElementById('pass-tile').addEventListener('click', startPassAndPlay);
   document.getElementById('custom-game-link').addEventListener('click', openCustomGameSheet);
-  document.getElementById('bot-play-btn').addEventListener('click', playBot);
 
-  document.querySelectorAll('[data-time-control-mount]').forEach((el) => ui.mountTimeControlPicker(el));
   wireRatedToggle();
-  loadHouseBots();
   refreshSeeksList();
   refreshLive();
   setInterval(tickSeekAges, 1000);   // local clock only, no network

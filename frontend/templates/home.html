@@ -1,76 +1,43 @@
 {% extends "base.html" %}
 {% block title %}Pai Sho Lab{% endblock %}
 {% block content %}
-  <div class="home-grid">
-    <section id="home-play-block" class="home-play" aria-labelledby="home-play-heading">
-      <h1 id="home-play-heading">Play a person</h1>
-      <div class="time-control">
-        <span class="muted time-control__label">Time control</span>
-        <div data-time-control-mount></div>
+  <div class="lobby">
+    <section class="lobby__pair" aria-labelledby="pair-heading">
+      <div class="lobby__head">
+        <h1 id="pair-heading">Play</h1>
         <div id="rated-toggle" class="chip-row rated-toggle" role="group" aria-label="Rated or casual" hidden>
           <button type="button" class="chip" data-rated="casual" aria-pressed="true">Casual</button>
           <button type="button" class="chip" data-rated="rated" aria-pressed="false">Rated</button>
         </div>
-        <p class="muted time-control__note">Pass and play is never timed.</p>
       </div>
-      <div class="tile-grid">
-        <button type="button" class="tile tile--primary" id="quick-match-tile">
-          <img class="tile-icon" src="/static/tiles/GL.png" alt="" width="36" height="36">
-          <span class="tile-text">
-            <h3>Quick match</h3>
-            <p class="tile-sub muted">Get paired with the next person looking for a game.</p>
-          </span>
-        </button>
-        <ul id="quick-match-seeks" class="qm-seeks" hidden></ul>
-
-        <button type="button" class="tile" id="challenge-tile">
-          <img class="tile-icon" src="/static/tiles/HR3.png" alt="" width="36" height="36">
-          <span class="tile-text">
-            <h3>Challenge a friend</h3>
-            <p class="tile-sub muted">Share a link. They take the other seat.</p>
-          </span>
-        </button>
-
-        <button type="button" class="tile" id="pass-tile">
-          <span class="tile-icon tile-icon--pair" aria-hidden="true">
-            <img src="/static/tiles/HR3.png" alt="" width="30" height="30">
-            <img src="/static/tiles/GR3.png" alt="" width="30" height="30">
-          </span>
-          <span class="tile-text">
-            <h3>Pass and play</h3>
-            <p class="tile-sub muted">Two players, one device.</p>
-          </span>
-        </button>
+      <p class="muted lobby__hint">Pick a time control to be paired with the next person looking for a game.</p>
+      <div id="pairing-grid" class="pairing-grid" role="group" aria-label="Quick pairing">
+        <button type="button" class="pair-tile" data-pair="3+2"><b>3+2</b><span>Blitz</span></button>
+        <button type="button" class="pair-tile" data-pair="5+3"><b>5+3</b><span>Blitz</span></button>
+        <button type="button" class="pair-tile" data-pair="10+5"><b>10+5</b><span>Rapid</span></button>
+        <button type="button" class="pair-tile" data-pair="15+10"><b>15+10</b><span>Rapid</span></button>
+        <button type="button" class="pair-tile" data-pair="untimed"><b>&infin;</b><span>Untimed</span></button>
+        <button type="button" class="pair-tile pair-tile--custom" id="custom-game-link"><b>Custom</b><span>Setup</span></button>
       </div>
-      <button type="button" class="btn btn-quiet custom-game-link" id="custom-game-link">Custom game</button>
     </section>
 
-    <div id="home-side-block" class="home-side">
-      <section class="home-bots" aria-labelledby="home-bots-heading">
-        <h2 id="home-bots-heading">Play MushiBot</h2>
-        <div class="time-control">
-          <span class="muted time-control__label">Time control</span>
-          <div data-time-control-mount></div>
-        </div>
-        <div class="home-bots__row">
-          <div id="bot-level-row" class="chip-row"></div>
-          <button type="button" class="btn btn-primary" id="bot-play-btn">Play</button>
-        </div>
-        <p id="bot-level-line" class="muted bot-level-line"></p>
-      </section>
+    <aside class="lobby__side" aria-label="Other ways to play">
+      <button type="button" class="btn btn-primary lobby-btn" id="challenge-tile">Play with a friend</button>
+      <button type="button" class="btn lobby-btn" id="bot-open-btn">Play MushiBot</button>
+      <button type="button" class="btn lobby-btn" id="pass-tile">Pass and play</button>
+      <a class="lobby-learn" href="/learn"><b>New to Pai Sho?</b> <span class="muted">Learn in 5 minutes.</span></a>
+    </aside>
 
-      <a class="tile home-learn-card" href="/learn">
-        <span class="tile-text">
-          <h3>New to Pai Sho?</h3>
-          <p class="tile-sub muted">Learn in 5 minutes.</p>
-        </span>
-      </a>
+    <section class="lobby__seeks" aria-labelledby="home-seeks-heading">
+      <h2 id="home-seeks-heading" class="lobby__sub">Open games</h2>
+      <ul id="quick-match-seeks" class="qm-seeks"></ul>
+      <p id="quick-match-empty" class="muted qm-empty">Nobody is waiting. Pick a time control above and you will be listed here.</p>
+    </section>
 
-      <section class="home-live" aria-labelledby="home-live-heading">
-        <h2 id="home-live-heading">Live now</h2>
-        <div id="live-list"></div>
-      </section>
-    </div>
+    <section class="lobby__live" aria-labelledby="home-live-heading">
+      <h2 id="home-live-heading" class="lobby__sub">Live now</h2>
+      <div id="live-list" class="live-strip"></div>
+    </section>
   </div>
 
   <footer class="home-footer">

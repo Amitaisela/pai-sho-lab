@@ -1,0 +1,5 @@
+{"name": "stranding_allowed", "ref": "PDF p.15: the game ends only by a Harmony Ring, a last Basic Flower or a forfeit; there is no rule against leaving the opponent without a move",
+ "note": "The position the engine's old no-stranding filter was built on: planting into (9,1) used to be refused because Host would have had nothing to do. It is a legal move.",
+ "state": {"board": {"1,9": "Rose/2/g", "1,8": "Chrysanthemum/1", "1,10": "Rhododendron/1", "2,9": "Lily/1",
+                     "17,9": "Rose/1/g", "9,17": "Chrysanthemum/1/g"}},
+ "checks": [{"legal_includes": [["plant", "Jasmine", 9, 1], ["plant", "Rose", 9, 1], ["arrange", 2, 9, 3, 9]]}]}

@@ -7,6 +7,7 @@
  * Lab link's visibility, a tiny fetch wrapper, and the bottom-sheet/dialog
  * used for the menu and (later) game setup.
  */
+import * as sounds from '/static/js/sound.js';
 
 const NICK_KEY = 'pai_nickname';
 const CLIENT_KEY = 'pai_client_id';
@@ -200,8 +201,8 @@ export function csrfHeaders() {
   return accountHooks.csrf();
 }
 
-export async function api(path, { method = 'GET', body } = {}) {
-  const opts = { method, headers: {} };
+export async function api(path, { method = 'GET', body, headers } = {}) {
+  const opts = { method, headers: { ...(headers || {}) } };
   if (method !== 'GET') {
     await accountHooks.ready;
     Object.assign(opts.headers, accountHooks.csrf());
@@ -251,6 +252,43 @@ export function sheet(html, { onClose } = {}) {
   return close;
 }
 
+/** The name of the in-app browser (Instagram, Facebook, WhatsApp...) the page is open in, or null.
+ * Challenge links are often opened from a chat; those browsers keep their own storage (a seat
+ * taken there is lost in the real browser) and some (Google sign-in) refuse to run at all. */
+export function inAppBrowser() {
+  const ua = navigator.userAgent || '';
+  const m = ua.match(/(Instagram|FBAN|FBAV|FB_IAB|Messenger|WhatsApp|Snapchat|Telegram|MicroMessenger|Line\/|TikTok|Twitter)/i);
+  if (!m) return null;
+  return m[1].replace(/^FB.*/i, 'Facebook').replace(/^Line.*/i, 'Line').replace(/^MicroMessenger/i, 'WeChat');
+}
+
+/** HTML for the note shown when the page is in an in-app browser, or '' otherwise. */
+export function inAppBrowserNote(what) {
+  const app = inAppBrowser();
+  if (!app) return '';
+  return `<p class="inapp-note" role="note">You are in the ${app} browser. ${what} Open this page in Chrome or Safari`
+    + ' (the menu in the corner usually has "Open in browser").</p>';
+}
+
+/** Shares `url` with the system share sheet where there is one (phones), else copies it.
+ * Resolves 'shared', 'copied', 'cancelled' or 'failed'. */
+export async function shareLink({ url, title }) {
+  if (navigator.share) {
+    try {
+      await navigator.share({ url, title });
+      return 'shared';
+    } catch (e) {
+      if (e && e.name === 'AbortError') return 'cancelled';
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    return 'copied';
+  } catch {
+    return 'failed';
+  }
+}
+
 function applyStoredTheme() {
   const t = readLS(THEME_KEY);
   if (t === 'dark' || t === 'light') {
@@ -296,9 +334,12 @@ function menuHtml() {
       <a href="/bots">Bots</a>
       <a href="/developers">Developers</a>
       <a id="menu-lab-link" href="/lab" hidden>Lab</a>
+      <button type="button" id="menu-signin-btn" hidden>Sign in</button>
       <button type="button" id="menu-signout-btn" hidden>Sign out</button>
       <div class="menu-sep"></div>
       <button type="button" id="menu-theme-btn"></button>
+      <button type="button" id="menu-sound-btn"></button>
+      <button type="button" id="menu-haptics-btn" hidden></button>
     </div>
   `;
 }
@@ -312,14 +353,40 @@ function labelForTheme(t) {
  * hidden until `labAllowed()` resolves true. Safe to call once per page. */
 export function initChrome() {
   applyStoredTheme();
+  // The top bar's own navigation marks the page you are on.
+  document.querySelectorAll('.topbar__nav a').forEach((a) => {
+    const here = a.getAttribute('href') === '/'
+      ? location.pathname === '/' || location.pathname.startsWith('/game/')
+      : location.pathname === a.getAttribute('href') || location.pathname.startsWith(`${a.getAttribute('href')}/`);
+    if (here) a.setAttribute('aria-current', 'page');
+  });
   let labAllowedCache = false;
 
   const chip = document.querySelector('[data-nickname-chip]');
   if (chip) {
     chip.textContent = nickname();
     chip.addEventListener('click', () => {
-      const next = window.prompt('Your name, shown to opponents:', nickname());
-      if (next !== null) chip.textContent = setNickname(next);
+      // A sheet, not window.prompt: prompt() looks different in every browser and is blocked
+      // or mangled in the in-app browsers that open shared challenge links.
+      const close = sheet(`
+        <h2>Your name</h2>
+        <p class="muted">Shown to opponents when you play as a guest.</p>
+        <label class="game__field">Name
+          <input id="nick-input" type="text" maxlength="24" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" enterkeyhint="done">
+        </label>
+        <div class="game__sheet-actions">
+          <button type="button" class="btn btn-primary" id="nick-save">Save</button>
+          <button type="button" class="btn btn-quiet" id="nick-cancel">Cancel</button>
+        </div>`);
+      const input = document.getElementById('nick-input');
+      input.value = nickname();
+      input.focus();
+      input.select();
+      const save = () => { chip.textContent = setNickname(input.value); close(); };
+      document.getElementById('nick-save').addEventListener('click', save);
+      document.getElementById('nick-cancel').addEventListener('click', close);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
     });
   }
 
@@ -336,6 +403,27 @@ export function initChrome() {
         themeBtn.textContent = labelForTheme(currentTheme());
         themeBtn.addEventListener('click', () => {
           themeBtn.textContent = labelForTheme(toggleTheme());
+        });
+      }
+      const soundBtn = root.querySelector('#menu-sound-btn');
+      if (soundBtn) {
+        const label = () => { soundBtn.textContent = `Sound: ${sounds.soundOn() ? 'on' : 'off'}`; };
+        label();
+        soundBtn.addEventListener('click', () => {
+          sounds.setSound(!sounds.soundOn());
+          label();
+          sounds.play('move');         // so turning it on is audible
+        });
+      }
+      const hapticsBtn = root.querySelector('#menu-haptics-btn');
+      if (hapticsBtn && sounds.canVibrate()) {
+        hapticsBtn.hidden = false;
+        const label = () => { hapticsBtn.textContent = `Vibration: ${sounds.hapticsOn() ? 'on' : 'off'}`; };
+        label();
+        hapticsBtn.addEventListener('click', () => {
+          sounds.setHaptics(!sounds.hapticsOn());
+          label();
+          sounds.buzz(20);
         });
       }
       root.querySelectorAll('a').forEach((a) => a.addEventListener('click', close));

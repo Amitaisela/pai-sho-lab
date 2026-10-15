@@ -205,9 +205,9 @@ class PaiShoGame:
     def history(self, value):
         # An externally replaced history has unknown movers - matches Rust's
         # set_history (crates/pybind/src/lib.rs). Internal code that means to
-        # keep history_players valid (clone, from_dict, from_save_dict, the
-        # no-stranding sim) always re-assigns history_players right after
-        # assigning history, so this clear never sticks for them.
+        # keep history_players valid (clone, from_dict, from_save_dict) always
+        # re-assigns history_players right after assigning history, so this clear never
+        # sticks for them.
         self._history = list(value)
         self.history_players = []
 
@@ -518,13 +518,13 @@ class PaiShoGame:
                    for pos, t in self.board.items())
 
     def _is_trapped(self, r, c, tile):
-        """Orchid trap: an opponent's blooming flower tile next to a blooming Orchid can't arrange."""
-        if tile['growing']:
-            return False
+        """Orchid trap (rulebook p.12, literal reading): an opponent's flower tile on any of the
+        8 points around an Orchid can't be moved by Arranging, whether or not either tile is
+        growing."""
         enemy = 3 - tile['player']
         for dr, dc in _NEIGHBOURS_8:
             adj = self.board.get((r + dr, c + dc))
-            if adj and adj['flower'] == 'Orchid' and adj['player'] == enemy and not adj['growing']:
+            if adj and adj['flower'] == 'Orchid' and adj['player'] == enemy:
                 return True
         return False
 
@@ -688,15 +688,15 @@ class PaiShoGame:
         cached = self._legal_actions_cache
         if cached is not None and cached[0] == key:
             return cached[1]
-        actions = [a for a in self._iter_candidate_actions() if self._opponent_can_move_after(a)]
+        actions = list(self._iter_candidate_actions())
         if self.bonus_turn:
             actions.append(('skip_bonus',))
         self._legal_actions_cache = (key, actions, frozenset(actions))
         return actions
 
     def _iter_candidate_actions(self):
-        """Plant/arrange/bonus actions for the side to move (rulebook p.8), before the
-        no-stranding filter. A generator so callers that only need one can stop early."""
+        """Plant/arrange/bonus actions for the side to move (rulebook p.8). A generator so
+        callers that only need one can stop early."""
         player = self.current_player
         hand = self.hands[player]
         empty_gates = [g for g in GATES if g not in self.board]
@@ -751,7 +751,7 @@ class PaiShoGame:
 
     def _apply_effects(self, action):
         """Board and hand changes for a legal `action`, with no turn bookkeeping.
-        Used by step() and by what-if simulations."""
+        Used by step()."""
         kind = action[0]
         if kind == 'arrange':
             _, fr, fc, tr, tc = action
@@ -799,51 +799,6 @@ class PaiShoGame:
         if not self._has_any_legal_action():
             self._score_by_midlines()
             self._finish('no_moves')
-
-    def _opponent_can_move_after(self, action):
-        """No stranding (rules page): after `action`, as if the turn ended there, the
-        opponent must still be able to Plant (an open gate and a basic flower in reserve)
-        or Arrange some tile. Fast path without simulation when a gate stays open."""
-        opponent = 3 - self.current_player
-        if self._basic_count(opponent) > 0:
-            open_gates = {g for g in GATES if g not in self.board}
-            if action[0] == 'plant' and (action[2], action[3]) in _GATES_SET:
-                open_gates.discard((action[2], action[3]))
-            elif action[0] == 'arrange' and (action[1], action[2]) in _GATES_SET:
-                open_gates.add((action[1], action[2]))
-            if open_gates:
-                return True
-        sim = self._sim_copy()
-        sim._apply_effects(action)
-        return sim._can_move(opponent)
-
-    def _sim_copy(self):
-        """A throwaway copy for what-if simulation: board, hands, turn and hash, with no
-        history or caches (cheaper than clone()). The board copy is shallow on purpose:
-        _apply_effects and valid_destinations never mutate a tile dict in place, they
-        only move tile dicts between points or put fresh ones."""
-        sim = PaiShoGame.__new__(PaiShoGame)
-        sim.board = dict(self.board)
-        sim.hands = {pid: dict(hand) for pid, hand in self.hands.items()}
-        sim.current_player = self.current_player
-        sim.winner = self.winner
-        sim.end_reason = self.end_reason
-        sim.message = ''
-        sim.bonus_turn = self.bonus_turn
-        sim._setup = self._setup
-        sim._zhash = self._zhash
-        sim._harmony_cache = {}
-        sim._legal_actions_cache = None
-        sim.history = []
-        sim.history_players = []
-        return sim
-
-    def _can_move(self, player):
-        """Whether `player` would have any Plant or Arrange on a normal turn."""
-        if self._basic_count(player) > 0 and any(g not in self.board for g in GATES):
-            return True
-        return any(t['player'] == player and t['flower'] not in ACCENT_TILES and self._has_any_destination(r, c)
-                   for (r, c), t in list(self.board.items()))
 
     def _has_any_legal_action(self):
         return bool(self.get_legal_actions())

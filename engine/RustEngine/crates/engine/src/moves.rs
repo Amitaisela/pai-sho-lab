@@ -215,6 +215,44 @@ mod tests {
         Piece { tile, player, growing: false }
     }
 
+    fn clear_basic_flowers(board: &mut Board, player: Player) {
+        let hand = board.hands.get_mut(&player).unwrap();
+        for f in Flower::ALL {
+            hand.insert(Tile::Flower(f), 0);
+        }
+    }
+
+    #[test]
+    fn a_last_flower_plant_that_leaves_the_opponent_stuck_is_legal_and_ends_the_game() {
+        // Rulebook p.15 has no stranding rule: Host has no basic flower and only a Rock, so
+        // Host will have no move, yet the Guest's last basic flower must still be offered.
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(5, 5), piece(Tile::Accent(crate::tile::AccentTile::Rock), Player::Two));
+        clear_basic_flowers(&mut board, Player::One);
+        clear_basic_flowers(&mut board, Player::Two);
+        board.hands.get_mut(&Player::One).unwrap().insert(Tile::Flower(Flower::Rose), 1);
+        let plant = Action::Plant { tile: Tile::Flower(Flower::Rose), at: Position::new(9, 1), displace: None };
+        assert!(board.legal_actions().contains(&plant));
+        assert_eq!(board.step(plant), Ok(true));
+        assert_eq!(board.end_reason, Some(EndReason::LastBasicFlower));
+        assert_eq!(board.winner, Some(Outcome::Tie));
+    }
+
+    #[test]
+    fn a_player_with_no_legal_action_ends_the_game_as_no_moves() {
+        // House rule (owner decision 2026-10-15): the rulebook does not cover a stuck player,
+        // so the game ends as `no_moves`, scored by midline harmonies. Guest has only a Rock.
+        let mut board = Board::new();
+        board.pieces.insert(Position::new(5, 5), piece(Tile::Accent(crate::tile::AccentTile::Rock), Player::One));
+        board.pieces.insert(Position::new(9, 9), piece(Tile::Flower(Flower::Rose), Player::Two));
+        clear_basic_flowers(&mut board, Player::One);
+        board.current_player = Player::Two;
+        let arrange = Action::Arrange { from: Position::new(9, 9), to: Position::new(9, 10) };
+        assert_eq!(board.step(arrange), Ok(true));
+        assert_eq!(board.end_reason, Some(EndReason::NoMoves));
+        assert_eq!(board.winner, Some(Outcome::Tie));
+    }
+
     #[test]
     fn no_harmony_no_exhaustion_switches_player() {
         // Nothing on the board -> plain turn switch, no winner, no bonus turn.

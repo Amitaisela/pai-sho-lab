@@ -1,4 +1,4 @@
-{"name": "legal_actions_speed_all_gates_full", "ref": "performance: no-stranding slow path",
+{"name": "legal_actions_speed_all_gates_full", "ref": "performance: crowded gates",
  "note": "A reachable 29-tile position (random play, Rust engine, seed 7): all four gates hold the Host's growing tiles, so every candidate for the Guest needs a stranding simulation. legal_count pins both engines to the same answer.",
  "state": {"board": {"1,6": "Lily/1",
                      "1,9": "Jasmine/2/g",

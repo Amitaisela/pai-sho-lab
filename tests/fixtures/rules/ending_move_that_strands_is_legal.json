@@ -1,0 +1,7 @@
+{"name": "ending_move_that_strands_is_legal", "ref": "PDF p.15 Playing Last Basic Flower Tile; no stranding rule exists",
+ "note": "Guest plays their last basic flower while Host has no basic flower in hand and only an accent on the board. Host will have no move, but the game ends on this plant, so the move must be offered and must end the game.",
+ "state": {"board": {"5,5": "Rock/2"},
+           "hands": {"1": {"Rose": 1, "Chrysanthemum": 0, "Rhododendron": 0, "Jasmine": 0, "Lily": 0, "Jade": 0},
+                     "2": {"Rose": 0, "Chrysanthemum": 0, "Rhododendron": 0, "Jasmine": 0, "Lily": 0, "Jade": 0}}},
+ "checks": [{"legal_includes": [["plant", "Rose", 9, 1]]},
+            {"step": ["plant", "Rose", 9, 1], "expect": {"winner": 0, "end_reason": "last_basic_flower"}}]}
