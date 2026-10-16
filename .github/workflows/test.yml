@@ -44,6 +44,9 @@ jobs:
       - name: Run tests
         run: python tests/basic_tests.py
 
+      - name: Online connector tests (fake site)
+        run: python tests/test_online_client.py
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
