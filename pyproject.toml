@@ -38,7 +38,7 @@ Repository = "https://github.com/Amitaisela/pai-sho-lab"
 
 [tool.setuptools.packages.find]
 where = [".", "engine", "backend"]
-include = ["Agents*", "PythonEngine*", "ui*"]
+include = ["Agents*", "PythonEngine*", "ui*", "paisho_online*"]
 
 [tool.ruff]
 line-length = 120

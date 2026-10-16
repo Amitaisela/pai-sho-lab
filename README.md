@@ -7,6 +7,8 @@
 
 A workbench for building, training, and playing AI agents for **Skud Pai Sho**, a two-player strategy board game on a circular board. You can play the game in your browser, pit agents against each other, and add your own agent by writing one Python file and one registry entry.
 
+This repository is independent open source. The optional online site lets you play your bot against other developers' bots through a small HTTP API; see [Play online](#play-online).
+
 > The game is [Skud Pai Sho](https://skudpaisho.com/), created by @SkudPaiSho and The Garden Gate community. This project is an independent AI lab built around it.
 
 **Jump to:** [Quickstart](#quickstart) · [Play](#i-want-to-play) · [Benchmark agents](#i-want-to-benchmark-agents) · [Add an agent](#i-want-to-add-an-agent) · [Testing](#testing)
