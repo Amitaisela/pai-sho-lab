@@ -164,7 +164,7 @@ def test_a_game_start_is_logged_so_a_long_game_does_not_look_like_a_hang():
     with FakeSite() as site:
         OnlineBot(BotApiClient(site.url, 'mbt_test'), 'random', max_games=1, reconnect_delay=0.05,
                   log=lambda *a, **k: lines.append(' '.join(map(str, a)))).run()
-    assert any('game g1 started' in l and 'other' in l for l in lines), lines
+    assert any('game g1 started' in ln and 'other' in ln for ln in lines), lines
 
 
 def test_cli_output_reaches_a_pipe_while_the_bot_is_still_running():
@@ -234,10 +234,10 @@ class _Stub:
 def test_cli_check_reports_the_site_and_the_rules_versions():
     with FakeSite() as site:
         code, lines = _main(['--check', '--token', 'mbt_x'], site.url)
-        assert code == 0 and any('rules_version' in l for l in lines)
+        assert code == 0 and any('rules_version' in ln for ln in lines)
     with FakeSite(rules_version=999) as site:
         code, lines = _main(['--check', '--token', 'mbt_x'], site.url)
-        assert code == 3 and any('999' in l for l in lines)
+        assert code == 3 and any('999' in ln for ln in lines)
 
 
 def test_cli_plays_a_game_and_trims_a_pasted_token():
@@ -254,7 +254,7 @@ def test_cli_without_a_token_explains_instead_of_crashing():
     try:
         with FakeSite() as site:
             code, lines = _main(['random', '--accept'], site.url)
-            assert code == 2 and any('PAISHO_TOKEN' in l for l in lines)
+            assert code == 2 and any('PAISHO_TOKEN' in ln for ln in lines)
     finally:
         if saved is not None:
             os.environ['PAISHO_TOKEN'] = saved
@@ -263,27 +263,27 @@ def test_cli_without_a_token_explains_instead_of_crashing():
 def test_cli_a_rejected_token_is_a_clear_message_and_never_echoed():
     with _Stub(401) as stub:
         code, lines = _main(['--check', '--token', 'mbt_secret_zzz'], stub.url)
-    assert code == 2 and any('token rejected (401)' in l for l in lines)
-    assert not any('mbt_secret_zzz' in l or 'Traceback' in l for l in lines)
+    assert code == 2 and any('token rejected (401)' in ln for ln in lines)
+    assert not any('mbt_secret_zzz' in ln or 'Traceback' in ln for ln in lines)
 
 
 def test_cli_validates_the_time_control_name_against_the_site():
     with FakeSite() as site:
         code, lines = _main(['random', '--token', 'mbt_x', '--seek', '99+99'], site.url)
-        assert code == 2 and any('99+99' in l and '3+2' in l for l in lines)
+        assert code == 2 and any('99+99' in ln and '3+2' in ln for ln in lines)
         code, lines = _main(['random', '--token', 'mbt_x', '--vs-house', '2', '99+99'], site.url)
-        assert code == 2 and any('99+99' in l for l in lines)
+        assert code == 2 and any('99+99' in ln for ln in lines)
         code, lines = _main(['random', '--token', 'mbt_x', '--challenge', 'bob', '4'], site.url)
-        assert code == 2 and any('4' in l and '3+2' in l for l in lines)
+        assert code == 2 and any('4' in ln and '3+2' in ln for ln in lines)
         assert not site.moves
 
 
 def test_cli_unknown_agent_and_bad_level_are_usage_errors():
     with FakeSite() as site:
         code, lines = _main(['no_such_agent', '--token', 'mbt_x', '--accept'], site.url)
-        assert code == 2 and any('no_such_agent' in l for l in lines)
+        assert code == 2 and any('no_such_agent' in ln for ln in lines)
         code, lines = _main(['random', '--token', 'mbt_x', '--vs-house', 'x', '3+2'], site.url)
-        assert code == 2 and any('level' in l for l in lines)
+        assert code == 2 and any('level' in ln for ln in lines)
 
 
 TESTS = [
