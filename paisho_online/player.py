@@ -104,7 +104,10 @@ class OnlineBot:
             except ApiError as e:
                 self.log(f'could not accept: {e}')
         elif kind == 'gameStart':
-            self._start_game(event['game']['id'])
+            game = event['game']
+            opponent = (game.get('opponent') or {}).get('name', '?')
+            self.log(f"game {game['id']} started against {opponent} (seat {game.get('seat', '?')})")
+            self._start_game(game['id'])
         elif kind == 'gameFinish':
             self.finished += 1
             game = event['game']

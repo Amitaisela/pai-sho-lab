@@ -153,8 +153,14 @@ class FakeSite:
 
             do_DELETE = do_POST
 
-        self.server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
-        self.server.daemon_threads = True
+        class Server(ThreadingHTTPServer):
+            daemon_threads = True
+
+            def handle_error(self, request, client_address):
+                if not isinstance(sys.exc_info()[1], ConnectionError):   # a killed client is expected
+                    super().handle_error(request, client_address)
+
+        self.server = Server(('127.0.0.1', 0), Handler)
         self.url = f'http://127.0.0.1:{self.server.server_address[1]}'
         self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
 

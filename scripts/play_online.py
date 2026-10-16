@@ -45,7 +45,13 @@ def _tc_names(meta):
     return [n for n in names if n]
 
 
-def main(argv=None, log=print):
+def _print(*args):
+    """print, flushed at once: with stdout piped (a log file, tee, a supervisor) Python would
+    otherwise hold the lines back until exit, and a bot in a long game would look silent."""
+    print(*args, flush=True)
+
+
+def main(argv=None, log=_print):
     args = build_parser().parse_args(argv)
     if not args.url:
         log('give the site address with --url (or PAISHO_URL)')

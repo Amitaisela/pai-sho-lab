@@ -159,6 +159,38 @@ def test_the_token_is_never_logged():
     assert lines and not any('mbt_secret_token' in x for x in lines)
 
 
+def test_a_game_start_is_logged_so_a_long_game_does_not_look_like_a_hang():
+    lines = []
+    with FakeSite() as site:
+        OnlineBot(BotApiClient(site.url, 'mbt_test'), 'random', max_games=1, reconnect_delay=0.05,
+                  log=lambda *a, **k: lines.append(' '.join(map(str, a)))).run()
+    assert any('game g1 started' in l and 'other' in l for l in lines), lines
+
+
+def test_cli_output_reaches_a_pipe_while_the_bot_is_still_running():
+    """Run with stdout piped (a log file, tee, a supervisor), the progress lines must arrive as
+    they happen, not only when the process exits: a bot in a long game must not look silent."""
+    import queue
+    import subprocess
+    import threading
+    with FakeSite() as site:
+        env = {k: v for k, v in os.environ.items() if k != 'PYTHONUNBUFFERED'}
+        env['PAISHO_TOKEN'] = 'mbt_x'
+        p = subprocess.Popen([sys.executable, os.path.join(ROOT, 'scripts', 'play_online.py'), 'random',
+                              '--url', site.url, '--accept'],          # no --games: it never exits by itself
+                             cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        got = queue.Queue()
+        threading.Thread(target=lambda: got.put(p.stdout.readline()), daemon=True).start()
+        try:
+            first = got.get(timeout=30)
+        except queue.Empty:
+            first = None
+        finally:
+            p.kill()
+            p.wait(timeout=10)
+        assert first is not None and 'connected as fakebot' in first, first
+
+
 def _main(argv, site_url):
     from scripts.play_online import main
     lines = []
@@ -269,6 +301,8 @@ TESTS = [
     test_a_429_without_retry_after_is_reported_and_not_retried,
     test_the_bot_reopens_a_dropped_game_stream_and_still_moves,
     test_the_token_is_never_logged,
+    test_a_game_start_is_logged_so_a_long_game_does_not_look_like_a_hang,
+    test_cli_output_reaches_a_pipe_while_the_bot_is_still_running,
     test_cli_check_reports_the_site_and_the_rules_versions,
     test_cli_plays_a_game_and_trims_a_pasted_token,
     test_cli_without_a_token_explains_instead_of_crashing,
