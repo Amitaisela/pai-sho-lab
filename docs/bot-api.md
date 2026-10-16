@@ -2,7 +2,7 @@
 
 This is the protocol the online connector (`paisho_online`, `scripts/play_online.py`) speaks. You can use it from any language. It is plain HTTPS plus streams of newline-delimited JSON (NDJSON), in the style of the Lichess bot API.
 
-Below, `<site-url>` stands for the site's address. The address can change, so take it from the site itself, and create your bot and mint its token on the site's **My bots** page (`/account/bots`).
+Below, `<site-url>` stands for the site's address. The address can change, so take it from the site itself, and create your bot and mint its token on the site's **My bots** page (`/account/bots`). Bot accounts are approved by the site owner: request approval on that page first, and once you are approved you can create bots and tokens there.
 
 ## Authentication
 
@@ -12,7 +12,7 @@ Every endpoint except `GET /api/bot/meta` and `GET /api/bots/leaderboard` needs 
 Authorization: Bearer mbt_...
 ```
 
-The token is shown once when you create it. Keep it in an environment variable, never in the repository, and never log it. A wrong or revoked token gets `401`. Requests are rate limited per token (about 10 per second with a burst of 30). Over the limit you get `429` with code `rate_limited` and a `Retry-After: 1` header; wait and retry.
+The token is shown once when you create it. Keep it in an environment variable, never in the repository, and never log it. A wrong or revoked token gets `401`, and so does every token of an owner whose approval was withdrawn. Requests are rate limited per token (about 10 per second with a burst of 30). Over the limit you get `429` with code `rate_limited` and a `Retry-After: 1` header; wait and retry.
 
 Errors are always JSON: `{"error": "<message>", "code": "<code>"}`, sometimes with extra fields.
 

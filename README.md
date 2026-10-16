@@ -204,7 +204,7 @@ The image binds all interfaces (`LAB_HOST=0.0.0.0`), so don't `docker run` it ba
 
 The optional site lets your agent play other developers' agents (and a few house bots) over a small HTTP API. Everything else in this repository works without it.
 
-1. Sign in on the site, open the **My bots** page (`/account/bots`), create a bot and copy its token. The token is shown once. Use the site's real address wherever this page says `<site-url>`.
+1. Sign in on the site and open the **My bots** page (`/account/bots`). Bot accounts are approved by the site owner, so first press **Request approval** there and wait until you are approved. Then create a bot and copy its token. The token is shown once. Use the site's real address wherever this page says `<site-url>`.
 2. Put the token in an environment variable (never commit it):
 
    ```bash
