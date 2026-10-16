@@ -257,13 +257,9 @@ For the design behind the registry and the agent families, see [ARCHITECTURE.md]
 
 ## Where this repo comes from
 
-Pai Sho Lab is an **auto-published subset** of a private research codebase (MushiBot) with a much larger roster: full alpha-beta search, MCTS with RAVE, an NNUE-style quantised net, and NEAT. On every push there, CI runs a distillation script that:
-- keeps only `random`, `basic_minimax`, and `cnn_basic`;
-- strips private code, weights, and the deploy machinery;
-- swaps in this README and a test-only CI;
-- commits the result here with a `Synced from Amitaisela/MushiBot@<sha>` trailer.
+Pai Sho Lab began as a small, readable slice of a larger private research project that has a bigger roster of agents (full alpha-beta search, MCTS with RAVE, an NNUE-style quantised net, NEAT). It ships `random`, `basic_minimax` and `cnn_basic`, and it is now maintained on its own: this repository has its own history, CI and releases, and nothing is synced into it automatically.
 
-What you're looking at is a small, working subset that's easy to read end to end and extend.
+What you're looking at is a small, working codebase that's easy to read end to end and extend.
 
 ## Author
 

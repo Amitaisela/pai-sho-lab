@@ -2,7 +2,7 @@
 
 This document explains how the pieces fit together and why they're built the way they are — the engine, the registry-driven agent system, and the design tradeoffs behind each agent family. For setup and usage, see [README.md](README.md).
 
-> Note on scope: this describes the full system, including agents that live in the private upstream research repo. The public template you're reading this in ships a minimal three-agent slice (`random`, `basic_minimax`, `cnn_basic`) — see the "Where this repo comes from" section in the README for why. Everything in the "Agent design spectrum" section below beyond those three describes agents that exist upstream, included here because the tradeoffs are the interesting part, not the specific file.
+> Note on scope: this describes the full system, including agents beyond the three this repository ships (`random`, `basic_minimax`, `cnn_basic`). Everything in the "Agent design spectrum" section below beyond those three describes agents from the larger research project this repository was cut from, included here because the tradeoffs are the interesting part, not the specific file.
 
 ## System overview
 
