@@ -159,6 +159,101 @@ def test_the_token_is_never_logged():
     assert lines and not any('mbt_secret_token' in x for x in lines)
 
 
+def _main(argv, site_url):
+    from scripts.play_online import main
+    lines = []
+    code = main(argv + ['--url', site_url], log=lines.append)
+    return code, lines
+
+
+class _Stub:
+    """A tiny HTTP server that answers every request with a fixed status and records the Authorization header."""
+
+    def __init__(self, status, body=b'{"error": "bad token", "code": "unauthorized"}'):
+        import http.server
+        import threading
+        outer = self
+        self.auth = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                outer.auth.append(self.headers.get('Authorization'))
+                self.send_response(status)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *a):
+                pass
+
+        self.srv = http.server.HTTPServer(('127.0.0.1', 0), H)
+        self.url = f'http://127.0.0.1:{self.srv.server_port}'
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        self.srv.shutdown()
+        self.srv.server_close()
+
+
+def test_cli_check_reports_the_site_and_the_rules_versions():
+    with FakeSite() as site:
+        code, lines = _main(['--check', '--token', 'mbt_x'], site.url)
+        assert code == 0 and any('rules_version' in l for l in lines)
+    with FakeSite(rules_version=999) as site:
+        code, lines = _main(['--check', '--token', 'mbt_x'], site.url)
+        assert code == 3 and any('999' in l for l in lines)
+
+
+def test_cli_plays_a_game_and_trims_a_pasted_token():
+    with FakeSite() as site:
+        code, _ = _main(['random', '--token', ' "mbt_x"' + chr(10), '--accept', '--games', '1'], site.url)
+        assert code == 0 and len(site.moves) == 1
+    with _Stub(200, b'{"api_version": 1, "rules_version": %d}' % RULES_VERSION) as stub:
+        code, _ = _main(['--check', '--token', " 'mbt_pasted'" + chr(13) + chr(10)], stub.url)
+        assert code == 0 and stub.auth == ['Bearer mbt_pasted']
+
+
+def test_cli_without_a_token_explains_instead_of_crashing():
+    saved = os.environ.pop('PAISHO_TOKEN', None)
+    try:
+        with FakeSite() as site:
+            code, lines = _main(['random', '--accept'], site.url)
+            assert code == 2 and any('PAISHO_TOKEN' in l for l in lines)
+    finally:
+        if saved is not None:
+            os.environ['PAISHO_TOKEN'] = saved
+
+
+def test_cli_a_rejected_token_is_a_clear_message_and_never_echoed():
+    with _Stub(401) as stub:
+        code, lines = _main(['--check', '--token', 'mbt_secret_zzz'], stub.url)
+    assert code == 2 and any('token rejected (401)' in l for l in lines)
+    assert not any('mbt_secret_zzz' in l or 'Traceback' in l for l in lines)
+
+
+def test_cli_validates_the_time_control_name_against_the_site():
+    with FakeSite() as site:
+        code, lines = _main(['random', '--token', 'mbt_x', '--seek', '99+99'], site.url)
+        assert code == 2 and any('99+99' in l and '3+2' in l for l in lines)
+        code, lines = _main(['random', '--token', 'mbt_x', '--vs-house', '2', '99+99'], site.url)
+        assert code == 2 and any('99+99' in l for l in lines)
+        code, lines = _main(['random', '--token', 'mbt_x', '--challenge', 'bob', '4'], site.url)
+        assert code == 2 and any('4' in l and '3+2' in l for l in lines)
+        assert not site.moves
+
+
+def test_cli_unknown_agent_and_bad_level_are_usage_errors():
+    with FakeSite() as site:
+        code, lines = _main(['no_such_agent', '--token', 'mbt_x', '--accept'], site.url)
+        assert code == 2 and any('no_such_agent' in l for l in lines)
+        code, lines = _main(['random', '--token', 'mbt_x', '--vs-house', 'x', '3+2'], site.url)
+        assert code == 2 and any('level' in l for l in lines)
+
+
 TESTS = [
     test_meta_and_the_event_stream_skip_keepalives,
     test_a_429_with_retry_after_is_retried_and_other_errors_raise_api_error,
@@ -174,6 +269,12 @@ TESTS = [
     test_a_429_without_retry_after_is_reported_and_not_retried,
     test_the_bot_reopens_a_dropped_game_stream_and_still_moves,
     test_the_token_is_never_logged,
+    test_cli_check_reports_the_site_and_the_rules_versions,
+    test_cli_plays_a_game_and_trims_a_pasted_token,
+    test_cli_without_a_token_explains_instead_of_crashing,
+    test_cli_a_rejected_token_is_a_clear_message_and_never_echoed,
+    test_cli_validates_the_time_control_name_against_the_site,
+    test_cli_unknown_agent_and_bad_level_are_usage_errors,
 ]
 
 if __name__ == '__main__':
