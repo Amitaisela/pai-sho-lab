@@ -11,7 +11,7 @@ This repository is independent open source. The optional online site lets you pl
 
 > The game is [Skud Pai Sho](https://skudpaisho.com/), created by @SkudPaiSho and The Garden Gate community. This project is an independent AI lab built around it.
 
-**Jump to:** [Quickstart](#quickstart) · [Play](#i-want-to-play) · [Benchmark agents](#i-want-to-benchmark-agents) · [Add an agent](#i-want-to-add-an-agent) · [Testing](#testing)
+**Jump to:** [Quickstart](#quickstart) · [Play](#i-want-to-play) · [Benchmark agents](#i-want-to-benchmark-agents) · [Add an agent](#i-want-to-add-an-agent) · [Play online](#play-online) · [Testing](#testing)
 
 ---
 
@@ -200,6 +200,31 @@ This runs the app plus a Tailscale sidecar. The Lab is reachable at `http://loca
 
 The image binds all interfaces (`LAB_HOST=0.0.0.0`), so don't `docker run` it bare on an untrusted network. Use compose (token required, reachable only on loopback and your tailnet), or pass `-e MUSHIBOT_API_TOKEN=<value> -p 127.0.0.1:5001:5001` yourself.
 
+## Play online
+
+The optional site lets your agent play other developers' agents (and a few house bots) over a small HTTP API. Everything else in this repository works without it.
+
+1. Sign in on the site, open the **My bots** page (`/account/bots`), create a bot and copy its token. The token is shown once. Use the site's real address wherever this page says `<site-url>`.
+2. Put the token in an environment variable (never commit it):
+
+   ```bash
+   export PAISHO_TOKEN=mbt_...          # Windows PowerShell: $env:PAISHO_TOKEN = "mbt_..."
+   export PAISHO_URL=https://<site-url>
+   ```
+
+3. Check that your clone and the site agree on the rules, then play:
+
+   ```bash
+   python scripts/play_online.py --check
+   python scripts/play_online.py basic_minimax --vs-house 1 3+2           # practice, unrated
+   python scripts/play_online.py basic_minimax --seek 3+2 --rated         # join the bot pool
+   python scripts/play_online.py my_agent --accept                        # answer challenges
+   ```
+
+   Time controls are given by name (`1+1`, `3+2`, `5+3`). `python scripts/play_online.py --help` lists every option.
+
+The free tier allows 1 game at a time, time controls 1+1, 3+2 and 5+3, and 100 games a day per bot. Rated games are bot against bot only, between bots of different owners. If your clone's rules are older than the site's, the connector tells you to `git pull` instead of playing. The full protocol, so you can write a connector in any language, is in [docs/bot-api.md](docs/bot-api.md).
+
 ## Testing
 
 ```bash
@@ -207,6 +232,7 @@ python tests/basic_tests.py         # test suite (what CI runs)
 python tests/test_rules_contract.py
 python tests/parity_fuzz.py
 python tests/test_notation.py
+python tests/test_online_client.py   # online connector, no network needed
 python -m Agents.registry           # registry validation
 cd engine/RustEngine && cargo test --workspace   # Rust engine, if you have a toolchain
 ```
