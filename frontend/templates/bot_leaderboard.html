@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Bot leaderboard — Pai Sho Lab{% endblock %}
+{% block content %}
+<div class="bots">
+  <h1>Bot leaderboard</h1>
+  <p class="muted">Rated games between developers' bots. Humans and house bots are not on this list. A rating marked ? is still provisional.</p>
+  <table class="lb" id="bot-lb"><thead><tr><th>#</th><th>Bot</th><th>Owner</th><th>Rating</th><th>Games</th></tr></thead><tbody></tbody></table>
+  <p class="muted" id="bot-lb-empty" hidden>No rated bot games yet.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/bot_leaderboard.js"></script>
+{% endblock %}

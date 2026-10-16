@@ -522,6 +522,7 @@ function seatNameHtml(p) {
   const label = escapeHtml(seatLabel(p));
   if (!seat || seat.name == null) return label;
   if (seat.kind === 'bot') return `${label} <span class="strip__tag">BOT</span>`;
+  if (seat.kind === 'api') return `<a class="strip__user" href="/@/${encodeURIComponent(seat.username || seat.name)}">${label}</a> <span class="strip__tag">BOT</span>`;
   if (seat.account && seat.username) {
     return document.body.hasAttribute('data-accounts')
       ? `<a class="strip__user" href="/@/${encodeURIComponent(seat.username)}">${label}</a>`
@@ -535,6 +536,7 @@ function seatLabel(p) {
   const seat = seats[p];
   if (!seat) return `Player ${p}`;
   if (seat.kind === 'bot') return seat.name || `MushiBot level ${seat.level}`;
+  if (seat.kind === 'api') return seat.name || 'Bot';
   return seat.name || 'Open seat';
 }
 

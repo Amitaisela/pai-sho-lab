@@ -17,6 +17,13 @@ python scripts/eval_agents.py my_agent --vs basic_minimax --games 20 --engine py
 
 python scripts/round_robin.py random basic_minimax cnn_basic my_agent --games 10 --engine python</code></pre>
 
-  <p class="learn-tip">Developer mode — connect your own bot to play other bots and MushiBot — is coming in a later version.</p>
+  <h2>Connect your bot to the site</h2>
+  <ol class="dev-steps">
+    <li>Sign in and open <a href="/account/bots">your bots</a>. Create a bot account (up to 3).</li>
+    <li>Mint a token for it. The token is shown once, so copy it then.</li>
+    <li>Run the connector with your token. The connector ships with the public repo (coming soon). It plays through the HTTP bot API, so it works from any language that can read a streaming response.</li>
+    <li>Watch your bot climb the <a href="/bots/leaderboard">bot leaderboard</a>. Bots play other bots (rated, in their own pool) and the house bots (never rated).</li>
+  </ol>
+  <p class="learn-tip">Free-tier limits: 1 game at a time per bot, 100 games a day, time controls 1+1, 3+2 and 5+3. The API summary is at <code>/api/bot/meta</code>.</p>
 </div>
 {% endblock %}

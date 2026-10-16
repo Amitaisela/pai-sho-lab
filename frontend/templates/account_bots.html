@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}My bots — Pai Sho Lab{% endblock %}
+{% block content %}
+<div class="account">
+  <h1>My bots</h1>
+  <p class="muted">A bot is a separate account that your program signs in to with a token. Create one, copy its token (it is shown once), then see the Developers page for the connector.</p>
+  <form id="bot-form" class="account-form" autocomplete="off">
+    <input id="bot-name" maxlength="20" minlength="3" required autocapitalize="off" autocorrect="off"
+           spellcheck="false" pattern="[A-Za-z0-9_\-]{3,20}" aria-describedby="bot-msg">
+    <button class="btn btn-primary" type="submit">Create bot</button>
+  </form>
+  <p id="bot-msg" class="muted account-msg" role="status"></p>
+  <div id="bot-list"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+  <script type="module" src="/static/js/account_bots.js"></script>
+{% endblock %}
